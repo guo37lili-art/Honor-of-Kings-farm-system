@@ -685,89 +685,25 @@ function toLocalIsoForInput(d) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-// ========== .ics 日历文件生成 ==========
-
-function formatIcsDate(ms) {
-  const d = new Date(ms);
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getUTCFullYear()}${pad(d.getUTCMonth()+1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`;
-}
-
-function escapeIcsText(s) {
-  return String(s).replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
-}
-
-function uuid() {
-  if (crypto && crypto.randomUUID) return crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-  });
-}
-
-// events: [{ start: ms, summary: string, description?: string, alarmMin?: number }]
-function generateIcs(calendarName, events) {
-  const lines = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//王者农场助手//CN',
-    'CALSCALE:GREGORIAN',
-    `X-WR-CALNAME:${escapeIcsText(calendarName)}`,
-  ];
-  for (const e of events) {
-    const endMs = e.end ?? (e.start + 5 * 60 * 1000);
-    lines.push('BEGIN:VEVENT');
-    lines.push(`UID:${uuid()}@wz-farm`);
-    lines.push(`DTSTAMP:${formatIcsDate(Date.now())}`);
-    lines.push(`DTSTART:${formatIcsDate(e.start)}`);
-    lines.push(`DTEND:${formatIcsDate(endMs)}`);
-    lines.push(`SUMMARY:${escapeIcsText(e.summary)}`);
-    if (e.description) lines.push(`DESCRIPTION:${escapeIcsText(e.description)}`);
-    if (typeof e.alarmMin === 'number' && e.alarmMin > 0) {
-      lines.push('BEGIN:VALARM');
-      lines.push('ACTION:DISPLAY');
-      lines.push(`TRIGGER:-PT${e.alarmMin}M`);
-      lines.push(`DESCRIPTION:${escapeIcsText(e.summary)}`);
-      lines.push('END:VALARM');
-    }
-    lines.push('END:VEVENT');
-  }
-  lines.push('END:VCALENDAR');
-  return lines.join('\r\n');
-}
-
-// 优先使用 Web Share API（调起 iOS 原生分享面板，可直接选"日历"）
-// 不支持时回退到传统下载
-// 返回 { method: 'shared' | 'download' | 'cancelled' }
-async function openIcs(filename, content) {
-  // iOS Safari/Chrome 15+、Android Chrome 都支持 Share API 带文件
-  if (navigator.share && navigator.canShare) {
-    try {
-      const file = new File([content], filename, { type: 'text/calendar' });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: '添加到日历' });
-        return { method: 'shared' };
-      }
-    } catch (e) {
-      if (e.name === 'AbortError') return { method: 'cancelled' };
-      // 其他错误继续走下载兜底
-    }
-  }
-  // 兜底：传统下载
-  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return { method: 'download' };
-}
+// ========== 日历订阅（.ics 生成已搬到 Supabase Edge Function）==========
 
 function isIOSDevice() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+
+// 打开订阅链接（Edge Function 托管的 .ics）
+// iOS：走 webcal:// 触发原生"订阅日历"，一次订阅永久自动同步
+// Android / 桌面：走 https:// 浏览器处理 MIME（可能下载，可能调起日历）
+function openCalendarSubscription(cropId, path) {
+  const host = new URL(SUPABASE_URL).host;
+  const query = `crop_id=${encodeURIComponent(cropId)}&path=${encodeURIComponent(path)}`;
+  if (isIOSDevice()) {
+    // webcal:// 协议：iOS 原生识别，弹出"订阅日历"对话框
+    window.location.href = `webcal://${host}/functions/v1/ics?${query}`;
+  } else {
+    // 其他平台：走 HTTPS，浏览器按 Content-Type 处理
+    window.open(`https://${host}/functions/v1/ics?${query}`, '_blank', 'noopener');
+  }
 }
 
 // ========== Alpine App ==========
@@ -1269,77 +1205,18 @@ function app() {
       }
     },
 
-    // --- 日历导出 ---
-    toastForIcsResult(result) {
-      if (result.method === 'shared') {
-        this.showToast('在分享面板选"日历"即可添加');
-      } else if (result.method === 'download') {
-        this.showToast(isIOSDevice()
-          ? '已下载 · Safari 下载栏点"打开"添加 / Files → Downloads'
-          : '已下载 · 通知栏或下载夹点 .ics 打开');
-      }
-      // 'cancelled' 静默
+    // --- 日历订阅（走 Edge Function 托管的 .ics，webcal:// 订阅）---
+    exportFastIcs(crop) {
+      openCalendarSubscription(crop.id, 'fast');
+      this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
     },
-
-    async exportFastIcs(crop) {
-      const state = this.cropState(crop);
-      const cropLabel = crop.type + 'h 作物';
-      const events = [];
-      if (state.shouldWaterNow) {
-        events.push({
-          start: Date.now() + 60 * 1000,
-          summary: `🔥 立刻浇水：${cropLabel}`,
-          description: '越早浇水越接近最快路径最优解',
-          alarmMin: 0,
-        });
-      } else if (state.fastConverged) {
-        // 最快 == 懒人即熟：这一次浇水就是即熟
-        events.push({
-          start: state.windowA,
-          summary: `🌾 浇水即熟：${cropLabel}`,
-          description: '此时浇水立即成熟可收',
-          alarmMin: 5,
-        });
-      } else {
-        // 中间阶段：还需要后续再浇一次，让用户浇完后重新导入
-        events.push({
-          start: state.windowA,
-          summary: `🏃 下次浇水截止：${cropLabel}`,
-          description: '在此时刻前完成下次浇水以保持最快路径。浇完后重新导入日历获取下一提醒。',
-          alarmMin: 10,
-        });
-      }
-      const result = await openIcs(`farm-fast-${crop.type}h-${crop.id.slice(0,8)}.ics`,
-        generateIcs(`最快·${cropLabel}`, events));
-      this.toastForIcsResult(result);
+    exportLazyIcs(crop) {
+      openCalendarSubscription(crop.id, 'lazy');
+      this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
     },
-
-    async exportLazyIcs(crop) {
-      const state = this.cropState(crop);
-      const cropLabel = crop.type + 'h 作物';
-      const events = [{
-        start: state.windowB,
-        summary: `💤 浇水即熟：${cropLabel}`,
-        description: '此时浇一次水立即成熟可收。之前别浇水（会进入禁浇期）。',
-        alarmMin: 5,
-      }];
-      const result = await openIcs(`farm-lazy-${crop.type}h-${crop.id.slice(0,8)}.ics`,
-        generateIcs(`懒人·${cropLabel}`, events));
-      this.toastForIcsResult(result);
-    },
-
-    async exportNaturalIcs(crop) {
-      const state = this.cropState(crop);
-      const cropLabel = crop.type + 'h 作物';
-      const events = [{
-        start: state.matMs,
-        summary: `🌱 自然成熟：${cropLabel}`,
-        description: '作物自然成熟，可直接收获',
-        alarmMin: 5,
-      }];
-      const result = await openIcs(`farm-natural-${crop.type}h-${crop.id.slice(0,8)}.ics`,
-        generateIcs(`自然·${cropLabel}`, events));
-      this.toastForIcsResult(result);
+    exportNaturalIcs(crop) {
+      openCalendarSubscription(crop.id, 'natural');
+      this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
     },
 
     // --- UI helpers ---
