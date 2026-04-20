@@ -736,17 +736,9 @@ function generateIcs(calendarName, events) {
   return lines.join('\r\n');
 }
 
-// 返回本次使用的方式：'ios-prompt' | 'download'
+// 统一走下载。iOS / Android 都需要用户手动点击 .ics 才能添加到日历
+// 浏览器内 JS 没有稳定 API 能直接触发系统日历导入
 function openIcs(filename, content) {
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-
-  if (isIOS) {
-    // iOS Safari：导航到 data:text/calendar 会自动弹出"添加到日历"对话框
-    window.location.href = `data:text/calendar;charset=utf-8,${encodeURIComponent(content)}`;
-    return 'ios-prompt';
-  }
-
-  // Android / 桌面：触发下载，用户从通知或文件管理器里点开 .ics
   const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -756,7 +748,10 @@ function openIcs(filename, content) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return 'download';
+}
+
+function isIOSDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }
 
 // ========== Alpine App ==========
@@ -1287,9 +1282,11 @@ function app() {
           alarmMin: 10,
         });
       }
-      const mode = openIcs(`farm-fast-${crop.type}h-${crop.id.slice(0,8)}.ics`,
+      openIcs(`farm-fast-${crop.type}h-${crop.id.slice(0,8)}.ics`,
         generateIcs(`最快·${cropLabel}`, events));
-      this.showToast(mode === 'ios-prompt' ? '请在弹窗里点"添加到日历"' : '.ics 已下载 · 点通知栏/下载夹打开');
+      this.showToast(isIOSDevice()
+        ? '已下载 · Safari 下载栏点"打开" → 添加到日历'
+        : '已下载 · 通知栏或下载夹点 .ics 打开');
     },
 
     exportLazyIcs(crop) {
@@ -1301,9 +1298,11 @@ function app() {
         description: '此时浇一次水立即成熟可收。之前别浇水（会进入禁浇期）。',
         alarmMin: 5,
       }];
-      const mode = openIcs(`farm-lazy-${crop.type}h-${crop.id.slice(0,8)}.ics`,
+      openIcs(`farm-lazy-${crop.type}h-${crop.id.slice(0,8)}.ics`,
         generateIcs(`懒人·${cropLabel}`, events));
-      this.showToast(mode === 'ios-prompt' ? '请在弹窗里点"添加到日历"' : '.ics 已下载 · 点通知栏/下载夹打开');
+      this.showToast(isIOSDevice()
+        ? '已下载 · Safari 下载栏点"打开" → 添加到日历'
+        : '已下载 · 通知栏或下载夹点 .ics 打开');
     },
 
     exportNaturalIcs(crop) {
@@ -1315,9 +1314,11 @@ function app() {
         description: '作物自然成熟，可直接收获',
         alarmMin: 5,
       }];
-      const mode = openIcs(`farm-natural-${crop.type}h-${crop.id.slice(0,8)}.ics`,
+      openIcs(`farm-natural-${crop.type}h-${crop.id.slice(0,8)}.ics`,
         generateIcs(`自然·${cropLabel}`, events));
-      this.showToast(mode === 'ios-prompt' ? '请在弹窗里点"添加到日历"' : '.ics 已下载 · 点通知栏/下载夹打开');
+      this.showToast(isIOSDevice()
+        ? '已下载 · Safari 下载栏点"打开" → 添加到日历'
+        : '已下载 · 通知栏或下载夹点 .ics 打开');
     },
 
     // --- UI helpers ---
