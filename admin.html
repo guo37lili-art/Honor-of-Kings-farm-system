@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>王者农场助手 · 管理后台</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>[x-cloak]{display:none!important}</style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+<div x-data="admin()" x-cloak class="max-w-5xl mx-auto p-4">
+
+  <header class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-bold">📊 农场管理后台</h1>
+    <template x-if="authed">
+      <div class="flex items-center gap-2 text-sm">
+        <button @click="loadAll()" class="text-emerald-600 hover:text-emerald-700">🔄 刷新</button>
+        <button @click="logout()" class="text-red-500 hover:text-red-700">登出</button>
+      </div>
+    </template>
+  </header>
+
+  <!-- Login -->
+  <template x-if="!authed">
+    <div class="bg-white rounded-xl shadow p-6 max-w-sm mx-auto space-y-3">
+      <h2 class="font-semibold text-center">管理员登录</h2>
+      <input x-model="loginForm.nickname" placeholder="管理员昵称"
+        class="w-full border rounded px-3 py-2" />
+      <input x-model="loginForm.pin" type="password" inputmode="numeric" maxlength="4"
+        placeholder="PIN"
+        class="w-full border rounded px-3 py-2" />
+      <button @click="login()" :disabled="loading"
+        class="w-full bg-slate-800 hover:bg-slate-900 text-white rounded py-2 font-semibold disabled:opacity-50">
+        <span x-text="loading ? '...' : '进入'"></span>
+      </button>
+      <p x-show="loginErr" class="text-red-500 text-sm text-center" x-text="loginErr"></p>
+    </div>
+  </template>
+
+  <!-- Dashboard -->
+  <template x-if="authed">
+    <div class="space-y-4">
+
+      <!-- 汇总 -->
+      <div class="bg-white rounded-xl shadow p-4 grid grid-cols-4 gap-2 text-center">
+        <div>
+          <div class="text-2xl font-bold" x-text="users.length"></div>
+          <div class="text-xs text-slate-500">👥 用户数</div>
+        </div>
+        <div>
+          <div class="text-2xl font-bold" x-text="crops.length"></div>
+          <div class="text-xs text-slate-500">🌱 作物总数</div>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-emerald-600" x-text="activeCrops.length"></div>
+          <div class="text-xs text-slate-500">💚 活动中</div>
+        </div>
+        <div>
+          <div class="text-2xl font-bold text-amber-600" x-text="matureCrops.length"></div>
+          <div class="text-xs text-slate-500">🌾 待收获</div>
+        </div>
+      </div>
+
+      <!-- 筛选 -->
+      <div class="flex items-center gap-2 text-sm">
+        <span class="text-slate-500">筛选：</span>
+        <button @click="filter='all'"
+          :class="filter==='all' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'"
+          class="px-3 py-1 rounded-full shadow-sm">全部</button>
+        <button @click="filter='active'"
+          :class="filter==='active' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600'"
+          class="px-3 py-1 rounded-full shadow-sm">活动中</button>
+        <button @click="filter='mature'"
+          :class="filter==='mature' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
+          class="px-3 py-1 rounded-full shadow-sm">待收获</button>
+        <button @click="filter='harvested'"
+          :class="filter==='harvested' ? 'bg-slate-500 text-white' : 'bg-white text-slate-600'"
+          class="px-3 py-1 rounded-full shadow-sm">已收获</button>
+      </div>
+
+      <!-- 按用户分组 -->
+      <template x-for="u in usersSorted" :key="u.nickname">
+        <div class="bg-white rounded-xl shadow">
+          <div class="px-4 py-3 border-b flex items-center justify-between">
+            <div>
+              <span class="font-bold" x-text="u.nickname"></span>
+              <span class="text-xs text-slate-500 ml-2" x-text="'注册于 ' + formatDateTime(u.created_at)"></span>
+            </div>
+            <div class="text-xs text-slate-500">
+              <span x-text="cropCountFor(u.nickname, 'active') + ' 活动 · '"></span>
+              <span x-text="cropCountFor(u.nickname, 'mature') + ' 待收 · '"></span>
+              <span x-text="cropCountFor(u.nickname, 'harvested') + ' 已收'"></span>
+            </div>
+          </div>
+          <div class="divide-y">
+            <template x-for="c in filteredCropsFor(u.nickname)" :key="c.id">
+              <div class="px-4 py-2.5 text-sm flex items-center gap-3">
+                <span class="text-xl" x-text="{8:'🌾',16:'🌽',32:'🫐'}[c.type]"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium">
+                    <span x-text="c.type + 'h'"></span>
+                    <span class="ml-2 text-xs px-1.5 py-0.5 rounded"
+                      :class="cropBadgeClass(c)" x-text="cropStatusLabel(c)"></span>
+                  </div>
+                  <div class="text-xs text-slate-500 mt-0.5">
+                    种于 <span x-text="formatDateTime(c.planted_at)"></span>
+                    · 已浇 <span x-text="(c.water_events||[]).length"></span> 次
+                    <template x-if="!c.harvested_at">
+                      <span>· 预计 <span x-text="formatDateTime(computeMatTime(c))"></span></span>
+                    </template>
+                    <template x-if="c.harvested_at">
+                      <span>· 收于 <span x-text="formatDateTime(c.harvested_at)"></span></span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </template>
+            <template x-if="filteredCropsFor(u.nickname).length === 0">
+              <div class="px-4 py-6 text-center text-sm text-slate-400">无符合筛选的作物</div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <template x-if="users.length === 0">
+        <div class="text-center text-slate-400 py-12">
+          还没有任何用户
+        </div>
+      </template>
+
+      <div class="text-[11px] text-slate-400 text-center py-2">
+        数据同步时间 <span x-text="formatDateTime(lastLoadAt)"></span>
+      </div>
+    </div>
+  </template>
+
+</div>
+
+<script>
+// Supabase 配置（与 index.html 保持一致）
+const SUPABASE_URL = 'https://eebimxoefmibbxxtmebp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlYmlteG9lZm1pYmJ4eHRtZWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NDIzNzQsImV4cCI6MjA5MjIxODM3NH0.zfHwvQ_o17Q10ZovGdWy9uNzhL_FsD463rUnDpNN180';
+const ADMIN_NICKNAME = '长缨';  // 管理员昵称（硬编码，改这里就能换管理员）
+
+let sbClient = null;
+
+const HOUR_MS = 3600 * 1000;
+
+function computeMatTime(crop) {
+  const T = crop.type * HOUR_MS;
+  const planted = new Date(crop.planted_at).getTime();
+  const waters = (crop.water_events || []).map(t => new Date(t).getTime());
+  if (waters.length === 0) return planted + T;
+  let reduction = T / 12;
+  for (let i = 1; i < waters.length; i++) {
+    const gap = waters[i] - waters[i-1];
+    const d = Math.min(1, 3 * gap / T);
+    reduction += d * T / 12;
+  }
+  return planted + T - reduction;
+}
+
+function formatDateTime(ts) {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  const now = new Date();
+  const opts = { hour: '2-digit', minute: '2-digit' };
+  const sameDay = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now.getTime() + 86400000).toDateString() === d.toDateString();
+  if (sameDay) return '今 ' + d.toLocaleTimeString('zh-CN', opts);
+  if (tomorrow) return '明 ' + d.toLocaleTimeString('zh-CN', opts);
+  return d.toLocaleDateString('zh-CN', {month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('zh-CN', opts);
+}
+
+function admin() {
+  return {
+    authed: false,
+    loading: false,
+    loginForm: { nickname: '', pin: '' },
+    loginErr: '',
+    users: [],
+    crops: [],
+    filter: 'all',
+    lastLoadAt: null,
+
+    init() {
+      sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const saved = localStorage.getItem('wz_admin_authed');
+      if (saved === ADMIN_NICKNAME) {
+        this.authed = true;
+        this.loadAll();
+      }
+    },
+
+    async login() {
+      this.loginErr = '';
+      const nick = this.loginForm.nickname.trim();
+      const pin = this.loginForm.pin.trim();
+      if (nick !== ADMIN_NICKNAME) {
+        this.loginErr = '非管理员';
+        return;
+      }
+      if (!/^\d{4}$/.test(pin)) {
+        this.loginErr = 'PIN 必须 4 位数字';
+        return;
+      }
+      this.loading = true;
+      try {
+        const { data, error } = await sbClient.rpc('auth_login', {
+          p_nickname: nick, p_pin: pin,
+        });
+        if (error) throw error;
+        if (!data || typeof data !== 'string') {
+          this.loginErr = '登录失败';
+          return;
+        }
+        this.authed = true;
+        localStorage.setItem('wz_admin_authed', ADMIN_NICKNAME);
+        await this.loadAll();
+      } catch (e) {
+        this.loginErr = '错误：' + (e.message || e);
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    logout() {
+      localStorage.removeItem('wz_admin_authed');
+      this.authed = false;
+      this.users = [];
+      this.crops = [];
+    },
+
+    async loadAll() {
+      const [usersRes, cropsRes] = await Promise.all([
+        sbClient.from('users').select('nickname, created_at').order('created_at', { ascending: false }),
+        sbClient.from('crops').select('*').order('planted_at', { ascending: false }),
+      ]);
+      this.users = usersRes.data || [];
+      this.crops = cropsRes.data || [];
+      this.lastLoadAt = Date.now();
+    },
+
+    // 派生：按 nickname 排序（有活动作物的优先）
+    get usersSorted() {
+      const now = Date.now();
+      return [...this.users].sort((a, b) => {
+        const aActive = this.crops.filter(c => c.user_nickname === a.nickname && !c.harvested_at).length;
+        const bActive = this.crops.filter(c => c.user_nickname === b.nickname && !c.harvested_at).length;
+        if (aActive !== bActive) return bActive - aActive;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+    },
+
+    get activeCrops() {
+      const now = Date.now();
+      return this.crops.filter(c => !c.harvested_at && computeMatTime(c) > now);
+    },
+    get matureCrops() {
+      const now = Date.now();
+      return this.crops.filter(c => !c.harvested_at && computeMatTime(c) <= now);
+    },
+    get harvestedCrops() {
+      return this.crops.filter(c => c.harvested_at);
+    },
+
+    cropCountFor(nickname, type) {
+      if (type === 'active') return this.activeCrops.filter(c => c.user_nickname === nickname).length;
+      if (type === 'mature') return this.matureCrops.filter(c => c.user_nickname === nickname).length;
+      if (type === 'harvested') return this.harvestedCrops.filter(c => c.user_nickname === nickname).length;
+      return this.crops.filter(c => c.user_nickname === nickname).length;
+    },
+
+    filteredCropsFor(nickname) {
+      const now = Date.now();
+      let pool = this.crops.filter(c => c.user_nickname === nickname);
+      if (this.filter === 'active') pool = pool.filter(c => !c.harvested_at && computeMatTime(c) > now);
+      if (this.filter === 'mature') pool = pool.filter(c => !c.harvested_at && computeMatTime(c) <= now);
+      if (this.filter === 'harvested') pool = pool.filter(c => c.harvested_at);
+      return pool;
+    },
+
+    cropStatusLabel(c) {
+      if (c.harvested_at) return '已收获';
+      const now = Date.now();
+      const mat = computeMatTime(c);
+      if (now >= mat) return '待收获';
+      return '生长中';
+    },
+    cropBadgeClass(c) {
+      if (c.harvested_at) return 'bg-slate-100 text-slate-500';
+      const now = Date.now();
+      const mat = computeMatTime(c);
+      if (now >= mat) return 'bg-amber-100 text-amber-700';
+      return 'bg-emerald-100 text-emerald-700';
+    },
+
+    formatDateTime(ts) { return formatDateTime(ts); },
+  };
+}
+</script>
+</body>
+</html>

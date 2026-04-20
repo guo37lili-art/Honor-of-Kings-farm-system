@@ -134,6 +134,17 @@
               </div>
             </template>
 
+            <template x-if="cropState(crop).phase === 'locked'">
+              <div class="bg-slate-100 border border-slate-300 rounded-lg p-3 space-y-1 text-sm">
+                <div class="font-semibold text-slate-700">🔒 冷却锁定 · 无法再浇水</div>
+                <div class="text-xs text-slate-600">
+                  上次浇水冷却至 <span class="font-semibold" x-text="formatDateTime(cropState(crop).cooldownEnd)"></span>，
+                  但作物会先于 <span class="font-semibold text-emerald-700" x-text="formatDateTime(cropState(crop).matMs)"></span> 自然成熟（<span x-text="formatDuration(cropState(crop).matMs - now)"></span>后）。
+                </div>
+                <div class="text-[11px] text-slate-500">不用任何操作，等自然成熟直接收。</div>
+              </div>
+            </template>
+
             <template x-if="cropState(crop).phase === 'last-water'">
               <div class="space-y-2">
                 <div class="text-center">
@@ -161,20 +172,23 @@
 
             <template x-if="cropState(crop).phase === 'normal'">
               <div class="space-y-2">
-                <!-- 干涸度条 -->
+                <!-- 湿润度条（蓝→绿→琥珀渐变，见底红字警示） -->
                 <div>
-                  <div class="flex justify-between text-xs text-slate-500 mb-1">
-                    <span>干涸度</span>
-                    <span x-text="Math.min(100, Math.round(cropState(crop).dryness*100)) + '%'"></span>
+                  <div class="flex justify-between text-xs mb-1">
+                    <span class="text-slate-500">💧 湿润度</span>
+                    <span :class="cropState(crop).moisture === 0 ? 'text-red-600 font-semibold' : 'text-slate-500'">
+                      <span x-text="Math.round(cropState(crop).moisture*100) + '%'"></span>
+                      <template x-if="cropState(crop).moisture === 0"><span> · 🚰 需浇水</span></template>
+                    </span>
                   </div>
                   <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
                     <div class="h-full dryness-bar"
                       :class="{
-                        'bg-emerald-500': cropState(crop).dryness < 0.7,
-                        'bg-amber-500': cropState(crop).dryness >= 0.7 && cropState(crop).dryness < 1,
-                        'bg-red-500': cropState(crop).dryness >= 1
+                        'bg-sky-500': cropState(crop).moisture > 0.7,
+                        'bg-teal-500': cropState(crop).moisture <= 0.7 && cropState(crop).moisture > 0.3,
+                        'bg-amber-500': cropState(crop).moisture <= 0.3 && cropState(crop).moisture > 0
                       }"
-                      :style="`width:${Math.min(100, cropState(crop).dryness*100)}%`"></div>
+                      :style="`width:${cropState(crop).moisture * 100}%`"></div>
                   </div>
                 </div>
 
@@ -190,25 +204,34 @@
                     </div>
                     <div class="flex items-baseline gap-1 flex-wrap">
                       <span class="text-[11px] text-slate-500">浇水时机：</span>
-                      <template x-if="cropState(crop).waterNow">
-                        <span class="text-lg font-bold text-emerald-700">立刻浇水 🔥 <span class="text-[11px] font-normal text-slate-500">· 越早越好</span></span>
+                      <template x-if="cropState(crop).shouldWaterNow">
+                        <span class="text-lg font-bold text-emerald-700">
+                          立刻浇水 🔥
+                          <template x-if="cropState(crop).waterNow"><span class="text-[11px] font-normal text-slate-500">· 越早越好</span></template>
+                          <template x-if="cropState(crop).windowAMissed"><span class="text-[11px] font-normal text-red-500">· 节奏已过，补浇止损</span></template>
+                        </span>
                       </template>
-                      <template x-if="!cropState(crop).waterNow && cropState(crop).fastConverged">
+                      <template x-if="!cropState(crop).shouldWaterNow && cropState(crop).fastConverged">
                         <span class="text-lg font-bold text-emerald-700">
                           <span x-text="formatDateTime(cropState(crop).windowA)"></span>
                           <span class="text-[11px] font-normal text-slate-500" x-text="'· 距浇水 ' + formatDuration(cropState(crop).windowA - now)"></span>
                         </span>
                       </template>
-                      <template x-if="!cropState(crop).waterNow && !cropState(crop).fastConverged">
+                      <template x-if="!cropState(crop).shouldWaterNow && !cropState(crop).fastConverged">
                         <span class="text-lg font-bold text-emerald-700">
                           <span x-text="formatDateTime(cropState(crop).windowA) + ' 前'"></span>
                           <span class="text-[11px] font-normal text-slate-500" x-text="'· 距浇水 ' + formatDuration(cropState(crop).windowA - now)"></span>
                         </span>
                       </template>
                     </div>
-                    <template x-if="!cropState(crop).waterNow && cropState(crop).fastDeadZoneStart > now">
+                    <template x-if="!cropState(crop).shouldWaterNow && !cropState(crop).inFastForbid && cropState(crop).fastForbidStart > now">
                       <div class="text-[10px] text-emerald-700 mt-1">
-                        ⚠ <span x-text="formatDateTime(cropState(crop).fastDeadZoneStart)"></span> 后不要擅自浇水，否则进入冷却无法即熟
+                        ⚠ <span x-text="formatDateTime(cropState(crop).fastForbidStart)"></span> 后进入禁浇期，此期间浇水会无法即熟
+                      </div>
+                    </template>
+                    <template x-if="cropState(crop).inFastForbid">
+                      <div class="text-[10px] text-red-600 font-semibold mt-1">
+                        🚫 禁浇期内 · 现在浇水会破坏即熟 · 请等到 <span x-text="formatDateTime(cropState(crop).predictedFastMat)"></span> 再浇
                       </div>
                     </template>
                   </div>
@@ -226,9 +249,14 @@
                         <span class="text-[11px] font-normal text-slate-500" x-text="'· 距浇水 ' + formatDuration(cropState(crop).windowB - now)"></span>
                       </span>
                     </div>
-                    <template x-if="cropState(crop).lazyDeadZoneStart > now">
+                    <template x-if="!cropState(crop).inLazyForbid && cropState(crop).lazyForbidStart > now">
                       <div class="text-[10px] text-amber-600 mt-1">
-                        ⚠ <span x-text="formatDateTime(cropState(crop).lazyDeadZoneStart)"></span> 后不要擅自浇水，否则进入冷却无法即熟
+                        ⚠ <span x-text="formatDateTime(cropState(crop).lazyForbidStart)"></span> 后进入禁浇期，此期间浇水会无法即熟
+                      </div>
+                    </template>
+                    <template x-if="cropState(crop).inLazyForbid">
+                      <div class="text-[10px] text-red-600 font-semibold mt-1">
+                        🚫 禁浇期内 · 现在浇水会破坏即熟 · 请等到 <span x-text="formatDateTime(cropState(crop).windowB)"></span> 再浇
                       </div>
                     </template>
                   </div>
@@ -464,9 +492,12 @@ function computeMatTime(crop) {
   let reduction = T / 12;                     // 首次 d=1
   for (let i = 1; i < waters.length; i++) {
     const gap = waters[i] - waters[i-1];
-    const d = Math.min(1, 3 * gap / T);
+    // 防御：water_events 乱序/重复时 gap<0 或=0，d 应 clamp 到 [0, 1]
+    const d = Math.max(0, Math.min(1, 3 * gap / T));
     reduction += d * T / 12;
   }
+  // 防御：reduction 不会超过 T（理论上不会，但 clamp 确保 mat ≥ planted）
+  reduction = Math.min(reduction, T);
   return planted + T - reduction;
 }
 
@@ -553,7 +584,8 @@ function computePredictedFastMat(crop, now) {
   }
 
   const predicted = baseFormula + waste / 5;
-  return Math.min(predicted, currentMat);
+  // 防御：不能比自然成熟更晚，也不能回到过去（now 之前）
+  return Math.max(nowMs, Math.min(predicted, currentMat));
 }
 
 // Window B：懒人路径——在此时刻浇一次水即可触发即熟
@@ -592,7 +624,8 @@ function computeDryness(crop, now) {
   const last = waters.length > 0 ? waters[waters.length - 1] : planted;
   // 没浇过水：土地默认"干"，显示 100%
   if (waters.length === 0) return 1;
-  return (now - last) / (T / 3);
+  // 防御：now < last 时返回 0 不返回负数
+  return Math.max(0, (now - last) / (T / 3));
 }
 
 // ========== Helpers ==========
@@ -776,6 +809,8 @@ function app() {
       const matMs = computeMatTime(crop);
       const events = crop.water_events || [];
       const dryness = computeDryness(crop, now);
+      // 湿润度：刚浇水 = 1（满），干涸至 0。视觉反方向，对用户更直觉
+      const moisture = Math.max(0, 1 - dryness);
 
       if (crop.harvested_at) {
         return { phase: 'harvested', matMs };
@@ -794,11 +829,34 @@ function app() {
       const cooldownMinLabel = Math.round(cdMs / 60000);
       // 0 浇水时：最快路径的最优行动是"立刻浇水"
       const waterNow = events.length === 0;
-      // 冷却死区（此时刻之后浇水会被冷却挡住即熟）
-      const fastDeadZoneStart = predictedFastMat - cdMs;
-      const lazyDeadZoneStart = windowB - cdMs;
-      // 最快与懒人路径是否已收敛（Window A 被 Window B 上限 cap 后相等）
+      // 禁浇期起点（此时刻之后浇水会被冷却挡住即熟）
+      const fastForbidStart = predictedFastMat - cdMs;
+      const lazyForbidStart = windowB - cdMs;
+      // 用户是否已经在禁浇期内（过了起点还没到即熟时刻）
+      const inFastForbid = !waterNow && now > fastForbidStart && now < predictedFastMat;
+      const inLazyForbid = !waterNow && now > lazyForbidStart && now < windowB;
+      // 最快与懒人路径是否已收敛（1 秒容差只防浮点误差）
       const fastConverged = !waterNow && Math.abs(windowA - windowB) < 1000;
+      // Window A 已错过（T/3 deadline 已过，每多拖延一秒 predicted 推后 0.2 秒）
+      const windowAMissed = !waterNow && windowA < now - 1000;
+      // 立刻浇水场景：没浇过 OR 已浇过但过了 deadline。两种情况的最优动作都是立刻浇
+      const shouldWaterNow = waterNow || windowAMissed;
+      // 冷却锁定：冷却期超过自然成熟时间 → 无法再浇水，只能等自然成熟
+      const lockedByCooldown = events.length > 0 && cooldownEnd > matMs;
+
+      // 冷却锁定优先级最高（在 last-water 判定之前）
+      if (lockedByCooldown) {
+        return {
+          phase: 'locked',
+          matMs,
+          dryness,
+          moisture,
+          cooldownEnd,
+          inCooldown,
+          cooldownMinLabel,
+          cooldownMsVal: cdMs,
+        };
+      }
 
       // 已进入"浇水即熟"阶段（冷却未生效时才能触发）
       if (preview.wouldMature) {
@@ -806,6 +864,7 @@ function app() {
           phase: 'last-water',
           matMs,
           dryness,
+          moisture,
           waterReductionMs: preview.reductionMs,
           windowA,
           windowB,
@@ -815,9 +874,13 @@ function app() {
           cooldownMinLabel,
           cooldownMsVal: cdMs,
           waterNow,
-          fastDeadZoneStart,
-          lazyDeadZoneStart,
+          shouldWaterNow,
+          fastForbidStart,
+          lazyForbidStart,
+          inFastForbid,
+          inLazyForbid,
           fastConverged,
+          windowAMissed,
         };
       }
 
@@ -825,6 +888,7 @@ function app() {
         phase: 'normal',
         matMs,
         dryness,
+        moisture,
         windowA,
         windowB,
         predictedFastMat,
@@ -835,9 +899,13 @@ function app() {
         cooldownMinLabel,
         cooldownMsVal: cdMs,
         waterNow,
-        fastDeadZoneStart,
-        lazyDeadZoneStart,
+        shouldWaterNow,
+        fastForbidStart,
+        lazyForbidStart,
+        inFastForbid,
+        inLazyForbid,
         fastConverged,
+        windowAMissed,
       };
     },
 
