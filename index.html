@@ -746,13 +746,16 @@ function toLocalIsoForInput(d) {
 
 // ========== 日历订阅（.ics 生成已搬到 Supabase Edge Function）==========
 
-function isIOSDevice() {
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+// Apple 设备（iOS/iPadOS/macOS）统一走 webcal:// —— 系统自带日历 app，点击可触发原生"订阅"对话框
+// Windows/Android/Linux 走 https:// —— 浏览器按 MIME 处理，下载或交给已注册的日历软件
+function isAppleDevice() {
+  const ua = navigator.userAgent;
+  if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return true;
+  if (/Macintosh|Mac OS X/.test(ua)) return true;
+  return false;
 }
 
 // 打开订阅链接（Edge Function 托管的 .ics）
-// iOS：走 webcal:// 触发原生"订阅日历"，一次订阅永久自动同步
-// Android / 桌面：走 https:// 浏览器处理 MIME
 // 参数形式：{ cropId, path } 单作物 | { user, path } 用户级聚合
 function openCalendarSubscription({ cropId, user, path }) {
   const host = new URL(SUPABASE_URL).host;
@@ -760,7 +763,7 @@ function openCalendarSubscription({ cropId, user, path }) {
   if (cropId) parts.push(`crop_id=${encodeURIComponent(cropId)}`);
   if (user)   parts.push(`user=${encodeURIComponent(user)}`);
   const query = parts.join('&');
-  if (isIOSDevice()) {
+  if (isAppleDevice()) {
     window.location.href = `webcal://${host}/functions/v1/ics?${query}`;
   } else {
     window.open(`https://${host}/functions/v1/ics?${query}`, '_blank', 'noopener');
@@ -1328,15 +1331,15 @@ function app() {
     // --- 日历订阅（走 Edge Function 托管的 .ics，webcal:// 订阅）---
     exportFastIcs(crop) {
       openCalendarSubscription({ cropId: crop.id, path: 'fast' });
-      this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
+      this.showToast(isAppleDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
     },
     exportLazyIcs(crop) {
       openCalendarSubscription({ cropId: crop.id, path: 'lazy' });
-      this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
+      this.showToast(isAppleDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
     },
     exportNaturalIcs(crop) {
       openCalendarSubscription({ cropId: crop.id, path: 'natural' });
-      this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
+      this.showToast(isAppleDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
     },
 
     // 用户级订阅：聚合所有未收获作物的某条路径
@@ -1347,7 +1350,7 @@ function app() {
       }
       openCalendarSubscription({ user: this.me.nickname, path });
       const pathLabel = path === 'fast' ? '最快' : path === 'lazy' ? '懒人' : '自然';
-      this.showToast(isIOSDevice()
+      this.showToast(isAppleDevice()
         ? `跳转订阅 · 选"订阅" · 以后新作物自动并入${pathLabel}日历`
         : `跳转到${pathLabel}日历链接`);
     },
