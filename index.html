@@ -76,15 +76,27 @@
 
       <!-- Add + Import buttons -->
       <template x-if="!viewingFriend">
-        <div class="grid grid-cols-2 gap-2">
-          <button @click="openAddModal()"
-            class="bg-white hover:bg-emerald-50 border-2 border-dashed border-emerald-300 rounded-xl py-3 text-emerald-600 font-semibold text-sm">
-            + 新种作物
-          </button>
-          <button @click="openImportModal()"
-            class="bg-white hover:bg-sky-50 border-2 border-dashed border-sky-300 rounded-xl py-3 text-sky-600 font-semibold text-sm">
-            📋 已种了怎么办
-          </button>
+        <div class="space-y-2">
+          <div class="grid grid-cols-2 gap-2">
+            <button @click="openAddModal()"
+              class="bg-white hover:bg-emerald-50 border-2 border-dashed border-emerald-300 rounded-xl py-3 text-emerald-600 font-semibold text-sm">
+              + 新种作物
+            </button>
+            <button @click="openImportModal()"
+              class="bg-white hover:bg-sky-50 border-2 border-dashed border-sky-300 rounded-xl py-3 text-sky-600 font-semibold text-sm">
+              📋 已种了怎么办
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button @click="subscribeUser('fast')"
+              class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg py-2 text-emerald-700 text-xs">
+              📅 订阅全部最快提醒
+            </button>
+            <button @click="subscribeUser('lazy')"
+              class="bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg py-2 text-amber-700 text-xs">
+              📅 订阅全部懒人提醒
+            </button>
+          </div>
         </div>
       </template>
 
@@ -693,15 +705,17 @@ function isIOSDevice() {
 
 // 打开订阅链接（Edge Function 托管的 .ics）
 // iOS：走 webcal:// 触发原生"订阅日历"，一次订阅永久自动同步
-// Android / 桌面：走 https:// 浏览器处理 MIME（可能下载，可能调起日历）
-function openCalendarSubscription(cropId, path) {
+// Android / 桌面：走 https:// 浏览器处理 MIME
+// 参数形式：{ cropId, path } 单作物 | { user, path } 用户级聚合
+function openCalendarSubscription({ cropId, user, path }) {
   const host = new URL(SUPABASE_URL).host;
-  const query = `crop_id=${encodeURIComponent(cropId)}&path=${encodeURIComponent(path)}`;
+  const parts = [`path=${encodeURIComponent(path)}`];
+  if (cropId) parts.push(`crop_id=${encodeURIComponent(cropId)}`);
+  if (user)   parts.push(`user=${encodeURIComponent(user)}`);
+  const query = parts.join('&');
   if (isIOSDevice()) {
-    // webcal:// 协议：iOS 原生识别，弹出"订阅日历"对话框
     window.location.href = `webcal://${host}/functions/v1/ics?${query}`;
   } else {
-    // 其他平台：走 HTTPS，浏览器按 Content-Type 处理
     window.open(`https://${host}/functions/v1/ics?${query}`, '_blank', 'noopener');
   }
 }
@@ -1207,16 +1221,29 @@ function app() {
 
     // --- 日历订阅（走 Edge Function 托管的 .ics，webcal:// 订阅）---
     exportFastIcs(crop) {
-      openCalendarSubscription(crop.id, 'fast');
+      openCalendarSubscription({ cropId: crop.id, path: 'fast' });
       this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
     },
     exportLazyIcs(crop) {
-      openCalendarSubscription(crop.id, 'lazy');
+      openCalendarSubscription({ cropId: crop.id, path: 'lazy' });
       this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
     },
     exportNaturalIcs(crop) {
-      openCalendarSubscription(crop.id, 'natural');
+      openCalendarSubscription({ cropId: crop.id, path: 'natural' });
       this.showToast(isIOSDevice() ? '跳转订阅 · 选"订阅"' : '跳转到日历链接');
+    },
+
+    // 用户级订阅：聚合所有未收获作物的某条路径
+    subscribeUser(path) {
+      if (!this.me) {
+        this.showToast('请先登录');
+        return;
+      }
+      openCalendarSubscription({ user: this.me.nickname, path });
+      const pathLabel = path === 'fast' ? '最快' : path === 'lazy' ? '懒人' : '自然';
+      this.showToast(isIOSDevice()
+        ? `跳转订阅 · 选"订阅" · 以后新作物自动并入${pathLabel}日历`
+        : `跳转到${pathLabel}日历链接`);
     },
 
     // --- UI helpers ---
