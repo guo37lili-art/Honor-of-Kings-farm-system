@@ -83,6 +83,32 @@
   <template x-if="me || viewingFriend">
     <div class="space-y-4">
 
+      <!-- 好友圈即熟提醒横幅：点一下跳到 TA 的农场页面 -->
+      <template x-if="!viewingFriend && friendAlerts.length > 0">
+        <div class="space-y-2">
+          <template x-for="alert in friendAlerts" :key="alert.crop.id">
+            <a :href="'#/u/' + encodeURIComponent(alert.crop.user_nickname)"
+               class="block bg-gradient-to-r from-red-50 to-amber-50 border-2 border-red-300 rounded-xl px-3 py-2.5 hover:shadow-md transition">
+              <div class="flex items-center gap-2">
+                <span class="text-xl">🔔</span>
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold text-red-700 text-sm leading-tight">
+                    <b x-text="alert.crop.user_nickname"></b> 的
+                    <span x-text="alert.crop.type + 'h ' + (alert.crop.name || '作物')"></span>
+                    <template x-if="alert.isLastWaterNow"><span> · 现在可浇水即收 🔥</span></template>
+                    <template x-if="!alert.isLastWaterNow">
+                      <span> · <span x-text="formatDuration(alert.windowB - now)"></span> 后可浇水即熟</span>
+                    </template>
+                  </div>
+                  <div class="text-[11px] text-slate-500 mt-0.5">点此去 TA 的农场 · 提醒上线</div>
+                </div>
+                <span class="text-slate-400">›</span>
+              </div>
+            </a>
+          </template>
+        </div>
+      </template>
+
       <!-- Add + Import buttons -->
       <template x-if="!viewingFriend">
         <div class="space-y-2">
@@ -575,6 +601,10 @@
 const SUPABASE_URL = 'https://eebimxoefmibbxxtmebp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlYmlteG9lZm1pYmJ4eHRtZWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NDIzNzQsImV4cCI6MjA5MjIxODM3NH0.zfHwvQ_o17Q10ZovGdWy9uNzhL_FsD463rUnDpNN180';
 
+// 好友圈（硬编码）：圈内人互相推送"浇水即熟 / 1h 内即将即熟"的作物提醒
+// 未来扩展方案：换成从 localStorage 或 users 表读，代码结构不变
+const FRIEND_LIST = ['长缨', '华山一棵松', 'lc'];
+
 // 模块级 Supabase 客户端 —— 不放进 Alpine 响应式 state，避免 Proxy 包装破坏内部私有字段
 let sbClient = null;
 
@@ -829,6 +859,8 @@ function app() {
     // 进行中的写操作 cropId 列表，防双击产生重复浇水/收获
     busyCrops: [],
     refreshing: false,
+    // 好友圈提醒列表：{ crop, windowB, isLastWaterNow } 对象数组
+    friendAlerts: [],
 
     // --- init ---
     async init() {
@@ -947,6 +979,52 @@ function app() {
       }
 
       this.crops = list;
+      // 顺带刷新好友圈即熟提醒（只有在自己视图且登录态下会真正拉）
+      await this.loadFriendAlerts();
+    },
+
+    // 拉好友圈（FRIEND_LIST 里除自己外的人）未收获作物，筛出"现在或 1h 内可浇水即熟"的
+    // 只在自己视图 + 当前用户属于好友圈内时生效
+    async loadFriendAlerts() {
+      if (this.viewingFriend || !this.me) {
+        this.friendAlerts = [];
+        return;
+      }
+      const myNick = this.me.nickname;
+      if (!FRIEND_LIST.includes(myNick)) {
+        this.friendAlerts = [];
+        return;
+      }
+      const friends = FRIEND_LIST.filter(n => n !== myNick);
+      if (friends.length === 0) {
+        this.friendAlerts = [];
+        return;
+      }
+      const { data, error } = await sbClient
+        .from('crops')
+        .select('*')
+        .in('user_nickname', friends)
+        .is('harvested_at', null);
+      if (error) { this.friendAlerts = []; return; }
+      const now = Date.now();
+      const windowMs = 60 * 60 * 1000;  // 1 小时
+      this.friendAlerts = (data || [])
+        .map(c => {
+          const matMs = computeMatTime(c);
+          if (now >= matMs) return null;  // 已自然成熟，浇水已无意义，不提醒
+          const preview = previewWaterEffect(c, now);
+          const windowB = computeWindowB(c);
+          const isLastWaterNow = preview.wouldMature && !preview.inCooldown;
+          const willBeSoon = !isLastWaterNow && (windowB - now >= 0) && (windowB - now <= windowMs);
+          if (!isLastWaterNow && !willBeSoon) return null;
+          return { crop: c, windowB, matMs, isLastWaterNow };
+        })
+        .filter(Boolean)
+        .sort((a, b) => {
+          // "现在就能即熟"的排最前；其他按 Window B 升序
+          if (a.isLastWaterNow !== b.isLastWaterNow) return a.isLastWaterNow ? -1 : 1;
+          return a.windowB - b.windowB;
+        });
     },
 
     // 手动刷新：重新拉作物列表并给玩家显式反馈
