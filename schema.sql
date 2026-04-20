@@ -27,10 +27,14 @@ create table if not exists public.crops (
                     check (mode in ('fast','lazy','target','nowater')),
   target_harvest  timestamptz,
   harvested_at    timestamptz,
+  name            text,
   created_at      timestamptz default now()
 );
 
 create index if not exists crops_user_idx on public.crops(user_nickname);
+
+-- 兼容旧库：确保 name 列存在
+alter table public.crops add column if not exists name text;
 
 -- ============================================================
 -- 2. RLS：读全开，写走 RPC（RPC 内部校验 PIN）
@@ -120,7 +124,7 @@ begin
 
   if p_action = 'insert' then
     insert into public.crops (
-      user_nickname, type, planted_at, water_events, mode, target_harvest
+      user_nickname, type, planted_at, water_events, mode, target_harvest, name
     ) values (
       p_nickname,
       (p_payload->>'type')::int,
@@ -132,7 +136,8 @@ begin
              and p_payload->>'target_harvest' is not null
         then (p_payload->>'target_harvest')::timestamptz
         else null
-      end
+      end,
+      nullif(p_payload->>'name', '')
     )
     returning * into v_new_row;
     return to_jsonb(v_new_row);
@@ -172,6 +177,11 @@ begin
           when p_payload ? 'target_harvest'
           then nullif(p_payload->>'target_harvest', '')::timestamptz
           else target_harvest
+        end,
+        name = case
+          when p_payload ? 'name'
+          then nullif(p_payload->>'name', '')
+          else name
         end
     where id = p_crop_id and user_nickname = p_nickname
     returning * into v_new_row;
