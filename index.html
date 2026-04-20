@@ -203,8 +203,8 @@
                       <div class="flex items-center gap-2">
                         <span class="text-xs text-slate-600">预计成熟 <span x-text="formatDateTime(cropState(crop).predictedFastMat)"></span></span>
                         <template x-if="!viewingFriend">
-                          <button @click="exportFastIcs(crop)" title="导出日历"
-                            class="text-xs hover:bg-emerald-100 rounded px-1">📅</button>
+                          <button @click="exportFastIcs(crop)" title="下载 .ics 加入日历"
+                            class="text-sm hover:bg-emerald-100 rounded px-1">📅</button>
                         </template>
                       </div>
                     </div>
@@ -249,8 +249,8 @@
                       <div class="flex items-center gap-2">
                         <span class="text-xs text-slate-600">预计成熟 <span x-text="formatDateTime(cropState(crop).windowB)"></span></span>
                         <template x-if="!viewingFriend">
-                          <button @click="exportLazyIcs(crop)" title="导出日历"
-                            class="text-xs hover:bg-amber-100 rounded px-1">📅</button>
+                          <button @click="exportLazyIcs(crop)" title="下载 .ics 加入日历"
+                            class="text-sm hover:bg-amber-100 rounded px-1">📅</button>
                         </template>
                       </div>
                     </div>
@@ -283,8 +283,8 @@
                           <span x-text="'· 距成熟 ' + formatDuration(cropState(crop).matMs - now)"></span>
                         </span>
                         <template x-if="!viewingFriend">
-                          <button @click="exportNaturalIcs(crop)" title="导出日历"
-                            class="text-xs hover:bg-slate-100 rounded px-1">📅</button>
+                          <button @click="exportNaturalIcs(crop)" title="下载 .ics 加入日历"
+                            class="text-sm hover:bg-slate-100 rounded px-1">📅</button>
                         </template>
                       </div>
                     </div>
@@ -736,9 +736,24 @@ function generateIcs(calendarName, events) {
   return lines.join('\r\n');
 }
 
-// 统一走下载。iOS / Android 都需要用户手动点击 .ics 才能添加到日历
-// 浏览器内 JS 没有稳定 API 能直接触发系统日历导入
-function openIcs(filename, content) {
+// 优先使用 Web Share API（调起 iOS 原生分享面板，可直接选"日历"）
+// 不支持时回退到传统下载
+// 返回 { method: 'shared' | 'download' | 'cancelled' }
+async function openIcs(filename, content) {
+  // iOS Safari/Chrome 15+、Android Chrome 都支持 Share API 带文件
+  if (navigator.share && navigator.canShare) {
+    try {
+      const file = new File([content], filename, { type: 'text/calendar' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: '添加到日历' });
+        return { method: 'shared' };
+      }
+    } catch (e) {
+      if (e.name === 'AbortError') return { method: 'cancelled' };
+      // 其他错误继续走下载兜底
+    }
+  }
+  // 兜底：传统下载
   const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -748,6 +763,7 @@ function openIcs(filename, content) {
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { method: 'download' };
 }
 
 function isIOSDevice() {
@@ -1254,7 +1270,18 @@ function app() {
     },
 
     // --- 日历导出 ---
-    exportFastIcs(crop) {
+    toastForIcsResult(result) {
+      if (result.method === 'shared') {
+        this.showToast('在分享面板选"日历"即可添加');
+      } else if (result.method === 'download') {
+        this.showToast(isIOSDevice()
+          ? '已下载 · Safari 下载栏点"打开"添加 / Files → Downloads'
+          : '已下载 · 通知栏或下载夹点 .ics 打开');
+      }
+      // 'cancelled' 静默
+    },
+
+    async exportFastIcs(crop) {
       const state = this.cropState(crop);
       const cropLabel = crop.type + 'h 作物';
       const events = [];
@@ -1282,14 +1309,12 @@ function app() {
           alarmMin: 10,
         });
       }
-      openIcs(`farm-fast-${crop.type}h-${crop.id.slice(0,8)}.ics`,
+      const result = await openIcs(`farm-fast-${crop.type}h-${crop.id.slice(0,8)}.ics`,
         generateIcs(`最快·${cropLabel}`, events));
-      this.showToast(isIOSDevice()
-        ? '已下载 · Safari 下载栏点"打开" → 添加到日历'
-        : '已下载 · 通知栏或下载夹点 .ics 打开');
+      this.toastForIcsResult(result);
     },
 
-    exportLazyIcs(crop) {
+    async exportLazyIcs(crop) {
       const state = this.cropState(crop);
       const cropLabel = crop.type + 'h 作物';
       const events = [{
@@ -1298,14 +1323,12 @@ function app() {
         description: '此时浇一次水立即成熟可收。之前别浇水（会进入禁浇期）。',
         alarmMin: 5,
       }];
-      openIcs(`farm-lazy-${crop.type}h-${crop.id.slice(0,8)}.ics`,
+      const result = await openIcs(`farm-lazy-${crop.type}h-${crop.id.slice(0,8)}.ics`,
         generateIcs(`懒人·${cropLabel}`, events));
-      this.showToast(isIOSDevice()
-        ? '已下载 · Safari 下载栏点"打开" → 添加到日历'
-        : '已下载 · 通知栏或下载夹点 .ics 打开');
+      this.toastForIcsResult(result);
     },
 
-    exportNaturalIcs(crop) {
+    async exportNaturalIcs(crop) {
       const state = this.cropState(crop);
       const cropLabel = crop.type + 'h 作物';
       const events = [{
@@ -1314,11 +1337,9 @@ function app() {
         description: '作物自然成熟，可直接收获',
         alarmMin: 5,
       }];
-      openIcs(`farm-natural-${crop.type}h-${crop.id.slice(0,8)}.ics`,
+      const result = await openIcs(`farm-natural-${crop.type}h-${crop.id.slice(0,8)}.ics`,
         generateIcs(`自然·${cropLabel}`, events));
-      this.showToast(isIOSDevice()
-        ? '已下载 · Safari 下载栏点"打开" → 添加到日历'
-        : '已下载 · 通知栏或下载夹点 .ics 打开');
+      this.toastForIcsResult(result);
     },
 
     // --- UI helpers ---
