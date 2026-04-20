@@ -109,13 +109,18 @@
                  'ring-2 ring-amber-400': cropState(crop).phase === 'mature' && !viewingFriend
                }">
 
-            <!-- 顶部：种类 + 时间 -->
+            <!-- 顶部：种类 + 名字（可重命名）+ 时间 -->
             <div class="flex items-start justify-between gap-2">
               <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-2xl"
                     x-text="{8:'🌾', 16:'🌽', 32:'🫐'}[crop.type]"></span>
-                  <span class="font-semibold" x-text="crop.type + 'h 作物'"></span>
+                  <span class="font-semibold" x-text="crop.type + 'h'"></span>
+                  <span class="font-semibold" x-text="'· ' + (crop.name || '作物')"></span>
+                  <template x-if="!viewingFriend">
+                    <button @click="openRename(crop)" title="重命名"
+                      class="text-xs text-slate-400 hover:text-emerald-600">✏️</button>
+                  </template>
                 </div>
                 <div class="text-xs text-slate-500 mt-1">
                   种于 <span x-text="formatDateTime(crop.planted_at)"></span>
@@ -129,8 +134,17 @@
 
             <!-- 状态分支 -->
             <template x-if="cropState(crop).phase === 'harvested'">
-              <div class="text-center text-sm text-slate-500 py-2">
-                ✅ 已收获 · <span x-text="formatDateTime(crop.harvested_at)"></span>
+              <div class="space-y-2">
+                <div class="text-center text-sm text-slate-500 py-1">
+                  ✅ 已收获 · <span x-text="formatDateTime(crop.harvested_at)"></span>
+                </div>
+                <div class="text-center text-[11px] text-slate-400">
+                  30 分钟后自动清理 · 或立即
+                  <template x-if="!viewingFriend">
+                    <button @click="confirmDelete(crop)"
+                      class="text-red-500 hover:text-red-700 underline">删除</button>
+                  </template>
+                </div>
               </div>
             </template>
 
@@ -374,6 +388,13 @@
         </div>
 
         <div>
+          <label class="text-sm text-slate-600">名字（可选）</label>
+          <input type="text" x-model="addForm.name" maxlength="20" placeholder="作物"
+            class="block w-full border rounded px-3 py-2 mt-1 box-border appearance-none text-base"
+            style="-webkit-appearance: none;" />
+        </div>
+
+        <div>
           <label class="text-sm text-slate-600">种植时间</label>
           <div class="flex gap-2 mt-1">
             <input type="datetime-local" x-model="addForm.planted_at"
@@ -432,6 +453,13 @@
         </div>
 
         <div>
+          <label class="text-sm text-slate-600">名字（可选）</label>
+          <input type="text" x-model="importForm.name" maxlength="20" placeholder="作物"
+            class="block w-full border rounded px-3 py-2 mt-1 box-border appearance-none text-base"
+            style="-webkit-appearance: none;" />
+        </div>
+
+        <div>
           <label class="text-sm text-slate-600">游戏显示的成熟时间</label>
           <input type="datetime-local" x-model="importForm.matureAt"
             class="block w-full min-w-0 max-w-full border rounded px-3 py-2 mt-1 box-border appearance-none text-base"
@@ -467,6 +495,25 @@
             class="flex-1 border border-slate-300 rounded py-2">取消</button>
           <button @click="submitImport()" :disabled="loading || !importFormValid()"
             class="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded py-2 font-semibold">添加到列表</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============== Rename Modal ============== -->
+  <template x-if="renameTarget">
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+         @click.self="renameTarget=null">
+      <div class="bg-white rounded-xl p-5 w-full max-w-sm space-y-3">
+        <h3 class="font-semibold">重命名作物</h3>
+        <input type="text" x-model="renameText" maxlength="20" placeholder="作物"
+          class="w-full border rounded px-3 py-2 text-base"
+          @keyup.enter="saveRename()" />
+        <div class="text-[11px] text-slate-400">留空会显示成"作物"</div>
+        <div class="flex gap-2">
+          <button @click="renameTarget=null" class="flex-1 border border-slate-300 rounded py-2">取消</button>
+          <button @click="saveRename()"
+            class="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded py-2 font-semibold">保存</button>
         </div>
       </div>
     </div>
@@ -739,6 +786,7 @@ function app() {
       type: 8,
       planted_at: '',
       waterAtPlant: true,
+      name: '',
     },
 
     importOpen: false,
@@ -747,9 +795,12 @@ function app() {
       matureAt: '',
       waterH: 0,
       waterM: 0,
+      name: '',
     },
 
     deleteTarget: null,
+    renameTarget: null,
+    renameText: '',
     toast: '',
 
     // --- init ---
@@ -843,7 +894,32 @@ function app() {
         .select('*')
         .eq('user_nickname', owner)
         .order('planted_at', { ascending: false });
-      if (!error) this.crops = data || [];
+      if (error) return;
+      let list = data || [];
+
+      // 已收获超过 30 min 的作物自动清理（仅自己视图，朋友视图不动）
+      if (!this.viewingFriend && this.me) {
+        const CLEANUP_MS = 30 * 60 * 1000;
+        const nowMs = Date.now();
+        const expired = list.filter(c =>
+          c.harvested_at && (nowMs - new Date(c.harvested_at).getTime() > CLEANUP_MS)
+        );
+        if (expired.length > 0) {
+          await Promise.all(expired.map(c =>
+            sbClient.rpc('crop_write', {
+              p_nickname: this.me.nickname,
+              p_pin_hash: this.me.pin_hash,
+              p_action: 'delete',
+              p_crop_id: c.id,
+              p_payload: {},
+            })
+          ));
+          const expiredIds = new Set(expired.map(c => c.id));
+          list = list.filter(c => !expiredIds.has(c.id));
+        }
+      }
+
+      this.crops = list;
     },
 
     get sortedCrops() {
@@ -968,6 +1044,7 @@ function app() {
         type: 8,
         planted_at: toLocalIsoForInput(new Date()),
         waterAtPlant: true,
+        name: '',
       };
       this.addOpen = true;
     },
@@ -984,6 +1061,7 @@ function app() {
         matureAt: toLocalIsoForInput(new Date(Date.now() + 4 * HOUR_MS)),
         waterH: 0,
         waterM: 0,
+        name: '',
       };
       this.importOpen = true;
     },
@@ -1044,6 +1122,7 @@ function app() {
           planted_at: virtualCrop.planted_at,
           mode: 'fast',
           water_events: virtualCrop.water_events,
+          name: (this.importForm.name || '').trim(),
         };
         const { data, error } = await sbClient.rpc('crop_write', {
           p_nickname: this.me.nickname,
@@ -1107,6 +1186,7 @@ function app() {
           planted_at: planted,
           mode: 'fast',   // schema 兼容占位，runtime 不再使用
           water_events: hpw ? [planted] : [],
+          name: (this.addForm.name || '').trim(),
         };
         const { data, error } = await sbClient.rpc('crop_write', {
           p_nickname: this.me.nickname,
@@ -1198,6 +1278,32 @@ function app() {
 
     confirmDelete(crop) {
       this.deleteTarget = crop;
+    },
+
+    openRename(crop) {
+      this.renameTarget = crop;
+      this.renameText = crop.name || '';
+    },
+    async saveRename() {
+      if (!this.me || !this.renameTarget) return;
+      const newName = (this.renameText || '').trim();
+      try {
+        const { data, error } = await sbClient.rpc('crop_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'update',
+          p_crop_id: this.renameTarget.id,
+          p_payload: { name: newName },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.renameTarget = null;
+        this.renameText = '';
+        this.showToast('已重命名');
+        await this.loadCrops();
+      } catch (e) {
+        alert('重命名失败：' + (e.message || e));
+      }
     },
     async deleteCrop(crop) {
       if (!this.me) return;
