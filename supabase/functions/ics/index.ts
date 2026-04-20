@@ -215,10 +215,11 @@ Deno.serve(async (req: Request) => {
 
   const url = new URL(req.url);
   const cropId = url.searchParams.get('crop_id');
+  const userNickname = url.searchParams.get('user');
   const path = url.searchParams.get('path') || 'fast';
 
-  if (!cropId) {
-    return new Response('missing crop_id', { status: 400, headers: CORS_HEADERS });
+  if (!cropId && !userNickname) {
+    return new Response('missing crop_id or user', { status: 400, headers: CORS_HEADERS });
   }
   if (!['fast', 'lazy', 'natural'].includes(path)) {
     return new Response('invalid path', { status: 400, headers: CORS_HEADERS });
@@ -229,8 +230,40 @@ Deno.serve(async (req: Request) => {
   if (!supabaseUrl || !anonKey) {
     return new Response('server misconfigured', { status: 500, headers: CORS_HEADERS });
   }
-
   const supabase = createClient(supabaseUrl, anonKey);
+
+  const pathLabel = path === 'fast' ? '最快' : path === 'lazy' ? '懒人' : '自然';
+
+  // 分支 A：用户级订阅——聚合该用户所有未收获作物
+  if (userNickname) {
+    const { data: crops, error } = await supabase
+      .from('crops')
+      .select('*')
+      .eq('user_nickname', userNickname)
+      .is('harvested_at', null)
+      .order('planted_at', { ascending: true });
+
+    const allEvents: IcsEvent[] = [];
+    if (!error && crops) {
+      for (const crop of crops) {
+        // 事件的 UID 保证每个 crop+path 唯一，删作物后事件自动消失
+        const events = eventsForPath(crop, path);
+        allEvents.push(...events);
+      }
+    }
+    const content = generateIcs(`${userNickname}·${pathLabel}`, allEvents);
+    return new Response(content, {
+      status: 200,
+      headers: {
+        ...CORS_HEADERS,
+        'Content-Type': 'text/calendar; charset=utf-8',
+        'Content-Disposition': `inline; filename="farm-${userNickname}-${path}.ics"`,
+        'Cache-Control': 'public, max-age=300',
+      },
+    });
+  }
+
+  // 分支 B：单作物订阅
   const { data: crop, error } = await supabase
     .from('crops')
     .select('*')
@@ -238,39 +271,29 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (error || !crop) {
-    // 作物不存在 → 返回空日历（让订阅失效但不报错）
     const content = generateIcs('作物已不存在', []);
     return new Response(content, {
       status: 200,
-      headers: {
-        ...CORS_HEADERS,
-        'Content-Type': 'text/calendar; charset=utf-8',
-      },
+      headers: { ...CORS_HEADERS, 'Content-Type': 'text/calendar; charset=utf-8' },
     });
   }
 
-  // 已收获 → 空日历
   if (crop.harvested_at) {
     const content = generateIcs(`${crop.type}h 作物（已收获）`, []);
     return new Response(content, {
       status: 200,
-      headers: {
-        ...CORS_HEADERS,
-        'Content-Type': 'text/calendar; charset=utf-8',
-      },
+      headers: { ...CORS_HEADERS, 'Content-Type': 'text/calendar; charset=utf-8' },
     });
   }
 
   const events = eventsForPath(crop, path);
-  const pathLabel = path === 'fast' ? '最快' : path === 'lazy' ? '懒人' : '自然';
   const content = generateIcs(`${pathLabel}·${crop.type}h 作物`, events);
-
   return new Response(content, {
     status: 200,
     headers: {
       ...CORS_HEADERS,
       'Content-Type': 'text/calendar; charset=utf-8',
-      'Content-Disposition': `inline; filename="farm-${path}-${cropId.slice(0, 8)}.ics"`,
+      'Content-Disposition': `inline; filename="farm-${path}-${cropId!.slice(0, 8)}.ics"`,
       'Cache-Control': 'public, max-age=300',
     },
   });
