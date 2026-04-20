@@ -83,28 +83,28 @@
   <template x-if="me || viewingFriend">
     <div class="space-y-4">
 
-      <!-- 好友圈即熟提醒横幅：点一下跳到 TA 的农场页面 -->
+      <!-- 好友圈即熟提醒横幅：按人合并一条，点主体跳 TA 农场，点"不再提示"本轮隐藏 -->
       <template x-if="!viewingFriend && friendAlerts.length > 0">
         <div class="space-y-2">
-          <template x-for="alert in friendAlerts" :key="alert.crop.id">
-            <a :href="'#/u/' + encodeURIComponent(alert.crop.user_nickname)"
-               class="block bg-gradient-to-r from-red-50 to-amber-50 border-2 border-red-300 rounded-xl px-3 py-2.5 hover:shadow-md transition">
-              <div class="flex items-center gap-2">
+          <template x-for="alert in friendAlerts" :key="alert.user">
+            <div class="bg-gradient-to-r from-red-50 to-amber-50 border-2 border-red-300 rounded-xl overflow-hidden">
+              <a :href="'#/u/' + encodeURIComponent(alert.user)"
+                 class="flex items-center gap-2 px-3 py-2.5 hover:bg-white/40 transition">
                 <span class="text-xl">🔔</span>
                 <div class="flex-1 min-w-0">
                   <div class="font-semibold text-red-700 text-sm leading-tight">
-                    <b x-text="alert.crop.user_nickname"></b> 的
-                    <span x-text="alert.crop.type + 'h ' + (alert.crop.name || '作物')"></span>
-                    <template x-if="alert.isLastWaterNow"><span> · 现在可浇水即收 🔥</span></template>
-                    <template x-if="!alert.isLastWaterNow">
-                      <span> · <span x-text="formatDuration(alert.windowB - now)"></span> 后可浇水即熟</span>
-                    </template>
+                    <b x-text="alert.user"></b> 的作物<template x-if="alert.count > 1"><span x-text="'（' + alert.count + ' 棵）'"></span></template>
+                    · <span x-text="friendAlertSummary(alert)"></span>
                   </div>
                   <div class="text-[11px] text-slate-500 mt-0.5">点此去 TA 的农场 · 提醒上线</div>
                 </div>
                 <span class="text-slate-400">›</span>
-              </div>
-            </a>
+              </a>
+              <button @click="dismissFriendAlert(alert)"
+                class="w-full border-t border-red-200 py-1.5 text-[11px] text-slate-500 hover:bg-red-100 hover:text-red-600 transition">
+                ✕ 不再提示（等 TA 浇水后再提醒）
+              </button>
+            </div>
           </template>
         </div>
       </template>
@@ -984,7 +984,7 @@ function app() {
     },
 
     // 拉好友圈（FRIEND_LIST 里除自己外的人）未收获作物，筛出"现在或 1h 内可浇水即熟"的
-    // 只在自己视图 + 当前用户属于好友圈内时生效
+    // 按人聚合成一条横幅；已点过"不再提示"且朋友未浇水的不显示
     async loadFriendAlerts() {
       if (this.viewingFriend || !this.me) {
         this.friendAlerts = [];
@@ -1006,9 +1006,13 @@ function app() {
         .in('user_nickname', friends)
         .is('harvested_at', null);
       if (error) { this.friendAlerts = []; return; }
+
       const now = Date.now();
       const windowMs = 60 * 60 * 1000;  // 1 小时
-      this.friendAlerts = (data || [])
+      const dismissed = new Set(JSON.parse(localStorage.getItem('wz_dismissed_alerts') || '[]'));
+
+      // 第一步：逐棵作物筛选
+      const cropAlerts = (data || [])
         .map(c => {
           const matMs = computeMatTime(c);
           if (now >= matMs) return null;  // 已自然成熟，浇水已无意义，不提醒
@@ -1017,14 +1021,55 @@ function app() {
           const isLastWaterNow = preview.wouldMature && !preview.inCooldown;
           const willBeSoon = !isLastWaterNow && (windowB - now >= 0) && (windowB - now <= windowMs);
           if (!isLastWaterNow && !willBeSoon) return null;
-          return { crop: c, windowB, matMs, isLastWaterNow };
+          // "不再提示"键 = cropId + 当前浇水次数。朋友下次浇水后 key 变化自动恢复提醒
+          const dismissKey = c.id + ':' + (c.water_events?.length || 0);
+          if (dismissed.has(dismissKey)) return null;
+          return { crop: c, windowB, isLastWaterNow };
         })
-        .filter(Boolean)
-        .sort((a, b) => {
-          // "现在就能即熟"的排最前；其他按 Window B 升序
-          if (a.isLastWaterNow !== b.isLastWaterNow) return a.isLastWaterNow ? -1 : 1;
-          return a.windowB - b.windowB;
-        });
+        .filter(Boolean);
+
+      // 第二步：按 user 聚合成单条横幅
+      const byUser = {};
+      for (const ca of cropAlerts) {
+        const u = ca.crop.user_nickname;
+        if (!byUser[u]) byUser[u] = { user: u, crops: [], windowBs: [], hasImmediate: false };
+        byUser[u].crops.push(ca.crop);
+        byUser[u].windowBs.push(ca.windowB);
+        if (ca.isLastWaterNow) byUser[u].hasImmediate = true;
+      }
+      this.friendAlerts = Object.values(byUser).map(g => ({
+        user: g.user,
+        count: g.crops.length,
+        crops: g.crops,
+        hasImmediate: g.hasImmediate,
+        soonestWindowB: Math.min(...g.windowBs),
+      })).sort((a, b) => {
+        if (a.hasImmediate !== b.hasImmediate) return a.hasImmediate ? -1 : 1;
+        return a.soonestWindowB - b.soonestWindowB;
+      });
+    },
+
+    // 动态生成横幅文案（跟 this.now 走）；修掉之前"已过 后可浇水即熟"的 stale bug
+    friendAlertSummary(alert) {
+      const anyImmediate = alert.crops.some(c => {
+        const preview = previewWaterEffect(c, this.now);
+        return preview.wouldMature && !preview.inCooldown;
+      });
+      if (anyImmediate) return '现在可浇水即收 🔥';
+      const delta = alert.soonestWindowB - this.now;
+      if (delta <= 0) return '现在可浇水即收 🔥';  // 兜底：越过 windowB 但 preview 因冷却没触发
+      return formatDuration(delta) + ' 后可浇水即熟';
+    },
+
+    // "不再提示"：记录当前这组作物的 cropId + 浇水次数到 localStorage
+    // 朋友下次浇水（水次+1）key 变化，提醒自动恢复
+    dismissFriendAlert(alert) {
+      const dismissed = new Set(JSON.parse(localStorage.getItem('wz_dismissed_alerts') || '[]'));
+      for (const c of alert.crops) {
+        dismissed.add(c.id + ':' + (c.water_events?.length || 0));
+      }
+      localStorage.setItem('wz_dismissed_alerts', JSON.stringify([...dismissed]));
+      this.friendAlerts = this.friendAlerts.filter(a => a !== alert);
     },
 
     // 手动刷新：重新拉作物列表并给玩家显式反馈
