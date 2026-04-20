@@ -97,6 +97,10 @@
               📅 订阅全部懒人提醒
             </button>
           </div>
+          <button @click="copyFarmLink()"
+            class="w-full bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg py-2 text-sky-700 text-xs">
+            🔗 复制我的农场链接 · 发给朋友看
+          </button>
         </div>
       </template>
 
@@ -138,6 +142,13 @@
                 <div class="text-center text-sm text-slate-500 py-1">
                   ✅ 已收获 · <span x-text="formatDateTime(crop.harvested_at)"></span>
                 </div>
+                <template x-if="!viewingFriend">
+                  <button @click="quickReplant(crop)"
+                    :disabled="busyCrops.includes(crop.id)"
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded py-2 text-sm font-semibold">
+                    ↻ 再种一棵（同类型 · 沿用"立刻浇水"设定）
+                  </button>
+                </template>
                 <div class="text-center text-[11px] text-slate-400">
                   30 分钟后自动清理 · 或立即
                   <template x-if="!viewingFriend">
@@ -153,7 +164,8 @@
                 <div class="text-center text-amber-700 font-bold">🌾 可收获</div>
                 <template x-if="!viewingFriend">
                   <button @click="harvest(crop)"
-                    class="w-full bg-amber-500 hover:bg-amber-600 text-white rounded py-2 font-semibold">
+                    :disabled="busyCrops.includes(crop.id)"
+                    class="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded py-2 font-semibold">
                     收获
                   </button>
                 </template>
@@ -183,7 +195,7 @@
                 </div>
                 <template x-if="!viewingFriend">
                   <button @click="waterAndHarvest(crop)"
-                    :disabled="cropState(crop).inCooldown"
+                    :disabled="cropState(crop).inCooldown || busyCrops.includes(crop.id)"
                     class="w-full bg-red-500 hover:bg-red-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded py-2 font-semibold">
                     <template x-if="!cropState(crop).inCooldown">
                       <span>浇水 + 收获</span>
@@ -331,7 +343,7 @@
 
                 <template x-if="!viewingFriend">
                   <button @click="water(crop)"
-                    :disabled="cropState(crop).inCooldown"
+                    :disabled="cropState(crop).inCooldown || busyCrops.includes(crop.id)"
                     class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded py-2 font-semibold">
                     <template x-if="!cropState(crop).inCooldown">
                       <span>浇水</span>
@@ -805,6 +817,8 @@ function app() {
     renameTarget: null,
     renameText: '',
     toast: '',
+    // 进行中的写操作 cropId 列表，防双击产生重复浇水/收获
+    busyCrops: [],
 
     // --- init ---
     async init() {
@@ -1211,28 +1225,42 @@ function app() {
     },
 
     // --- actions ---
+    // 同一作物的写操作串行化：RPC 在飞时不允许再次发起，防止双击在 loadCrops 完成前塞入重复时间戳
+    async _withBusy(cropId, fn) {
+      if (this.busyCrops.includes(cropId)) return false;
+      this.busyCrops.push(cropId);
+      try {
+        await fn();
+      } finally {
+        this.busyCrops = this.busyCrops.filter(id => id !== cropId);
+      }
+      return true;
+    },
+
     async water(crop) {
       if (!this.me) return;
       if (Date.now() < cooldownEndAt(crop)) {
         this.showToast('冷却中，无法浇水');
         return;
       }
-      const now = new Date().toISOString();
-      try {
-        const { data, error } = await sbClient.rpc('crop_write', {
-          p_nickname: this.me.nickname,
-          p_pin_hash: this.me.pin_hash,
-          p_action: 'water',
-          p_crop_id: crop.id,
-          p_payload: { at: now },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        this.showToast('已浇水');
-        await this.loadCrops();
-      } catch (e) {
-        alert('浇水失败：' + (e.message || e));
-      }
+      await this._withBusy(crop.id, async () => {
+        const now = new Date().toISOString();
+        try {
+          const { data, error } = await sbClient.rpc('crop_write', {
+            p_nickname: this.me.nickname,
+            p_pin_hash: this.me.pin_hash,
+            p_action: 'water',
+            p_crop_id: crop.id,
+            p_payload: { at: now },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          this.showToast('已浇水');
+          await this.loadCrops();
+        } catch (e) {
+          alert('浇水失败：' + (e.message || e));
+        }
+      });
     },
 
     async waterAndHarvest(crop) {
@@ -1241,42 +1269,46 @@ function app() {
         this.showToast('冷却中，无法浇水');
         return;
       }
-      const now = new Date().toISOString();
-      try {
-        const { data, error } = await sbClient.rpc('crop_write', {
-          p_nickname: this.me.nickname,
-          p_pin_hash: this.me.pin_hash,
-          p_action: 'water_and_harvest',
-          p_crop_id: crop.id,
-          p_payload: { at: now },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        this.showToast('🌾 已收获');
-        await this.loadCrops();
-      } catch (e) {
-        alert('收获失败：' + (e.message || e));
-      }
+      await this._withBusy(crop.id, async () => {
+        const now = new Date().toISOString();
+        try {
+          const { data, error } = await sbClient.rpc('crop_write', {
+            p_nickname: this.me.nickname,
+            p_pin_hash: this.me.pin_hash,
+            p_action: 'water_and_harvest',
+            p_crop_id: crop.id,
+            p_payload: { at: now },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          this.showToast('🌾 已收获');
+          await this.loadCrops();
+        } catch (e) {
+          alert('收获失败：' + (e.message || e));
+        }
+      });
     },
 
     async harvest(crop) {
       if (!this.me) return;
-      const now = new Date().toISOString();
-      try {
-        const { data, error } = await sbClient.rpc('crop_write', {
-          p_nickname: this.me.nickname,
-          p_pin_hash: this.me.pin_hash,
-          p_action: 'harvest',
-          p_crop_id: crop.id,
-          p_payload: { at: now },
-        });
-        if (error) throw error;
-        if (data?.error) throw new Error(data.error);
-        this.showToast('🌾 已收获');
-        await this.loadCrops();
-      } catch (e) {
-        alert('收获失败：' + (e.message || e));
-      }
+      await this._withBusy(crop.id, async () => {
+        const now = new Date().toISOString();
+        try {
+          const { data, error } = await sbClient.rpc('crop_write', {
+            p_nickname: this.me.nickname,
+            p_pin_hash: this.me.pin_hash,
+            p_action: 'harvest',
+            p_crop_id: crop.id,
+            p_payload: { at: now },
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          this.showToast('🌾 已收获');
+          await this.loadCrops();
+        } catch (e) {
+          alert('收获失败：' + (e.message || e));
+        }
+      });
     },
 
     confirmDelete(crop) {
@@ -1353,6 +1385,56 @@ function app() {
       this.showToast(isAppleDevice()
         ? `跳转订阅 · 选"订阅" · 以后新作物自动并入${pathLabel}日历`
         : `跳转到${pathLabel}日历链接`);
+    },
+
+    // 复制我自己的农场链接，发给朋友粘贴打开就能看我种了啥
+    async copyFarmLink() {
+      if (!this.me) return;
+      const url = `${location.origin}${location.pathname}#/u/${encodeURIComponent(this.me.nickname)}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        this.showToast('🔗 农场链接已复制');
+      } catch (e) {
+        // navigator.clipboard 失败时降级：用 prompt 弹出让用户手动复制
+        prompt('复制这个链接发给朋友：', url);
+      }
+    },
+
+    // 已收获的作物 → 再种一棵。同类型 + 沿用是否立刻浇水 + 沿用名字
+    // 原记录保留，让 30min 自动清理兜底（避免误点导致记录丢失）
+    async quickReplant(crop) {
+      if (!this.me) return;
+      await this._withBusy(crop.id, async () => {
+        const nowIso = new Date().toISOString();
+        // 判断原作物种下时是否立刻浇水：第一次浇水时间戳 ≈ 种植时间
+        // 用 1 秒容差避免 Postgres timestamptz 序列化和 JS toISOString 的精度/格式差
+        const plantedMs = new Date(crop.planted_at).getTime();
+        const firstWaterMs = (crop.water_events && crop.water_events.length > 0)
+          ? new Date(crop.water_events[0]).getTime() : null;
+        const wasWateredAtPlant = firstWaterMs !== null && Math.abs(firstWaterMs - plantedMs) < 1000;
+        const payload = {
+          type: crop.type,
+          planted_at: nowIso,
+          mode: 'fast',
+          water_events: wasWateredAtPlant ? [nowIso] : [],
+          name: crop.name || '',
+        };
+        try {
+          const { data, error } = await sbClient.rpc('crop_write', {
+            p_nickname: this.me.nickname,
+            p_pin_hash: this.me.pin_hash,
+            p_action: 'insert',
+            p_crop_id: null,
+            p_payload: payload,
+          });
+          if (error) throw error;
+          if (data?.error) throw new Error(data.error);
+          this.showToast('🌱 又种了一棵' + (wasWateredAtPlant ? ' · 已立刻浇水' : ''));
+          await this.loadCrops();
+        } catch (e) {
+          alert('重种失败：' + (e.message || e));
+        }
+      });
     },
 
     // --- UI helpers ---
