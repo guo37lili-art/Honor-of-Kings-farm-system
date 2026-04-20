@@ -22,28 +22,29 @@
 <div x-data="app()" x-cloak class="max-w-2xl mx-auto p-4">
 
   <!-- ============== Header ============== -->
-  <header class="flex items-center justify-between mb-4 pt-2">
-    <div class="flex items-center gap-3">
-      <h1 class="text-xl font-bold text-emerald-700">🌱 王者农场助手</h1>
+  <header class="flex items-center justify-between gap-2 mb-4 pt-2 flex-wrap">
+    <div class="flex items-center gap-2">
+      <h1 class="text-xl font-bold text-emerald-700 whitespace-nowrap">🌱 王者农场助手</h1>
       <template x-if="me || viewingFriend">
-        <button @click="refresh()" :disabled="refreshing"
-          class="text-sm text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
-          <span x-text="refreshing ? '刷新中...' : '🔄 刷新'"></span>
+        <button @click="refresh()" :disabled="refreshing" title="刷新"
+          class="text-lg text-emerald-600 hover:text-emerald-700 disabled:opacity-50 leading-none"
+          :class="{'animate-spin': refreshing}">
+          🔄
         </button>
       </template>
     </div>
     <div class="text-sm">
       <template x-if="me">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 whitespace-nowrap">
           <span class="text-slate-600">
-            <template x-if="viewingFriend"><span>看 <b x-text="viewingFriend"></b> 的农场</span></template>
+            <template x-if="viewingFriend"><span>👀 <b x-text="viewingFriend"></b></span></template>
             <template x-if="!viewingFriend"><span><b x-text="me.nickname"></b></span></template>
           </span>
           <template x-if="!viewingFriend">
             <button @click="logout()" class="text-red-500 hover:text-red-700">登出</button>
           </template>
           <template x-if="viewingFriend">
-            <button @click="backToMe()" class="text-emerald-600 hover:text-emerald-800">回自己的</button>
+            <button @click="backToMe()" class="text-emerald-600 hover:text-emerald-800">回自己</button>
           </template>
         </div>
       </template>
