@@ -376,7 +376,8 @@
         <div>
           <label class="text-sm text-slate-600">游戏显示的成熟时间</label>
           <input type="datetime-local" x-model="importForm.matureAt"
-            class="block w-full min-w-0 max-w-full border rounded px-3 py-2 mt-1 box-border" />
+            class="block w-full min-w-0 max-w-full border rounded px-3 py-2 mt-1 box-border appearance-none text-base"
+            style="-webkit-appearance: none;" />
         </div>
 
         <div>
@@ -855,9 +856,11 @@ function app() {
 
     // --- Import Modal（已种了怎么办） ---
     openImportModal() {
+      // 预填一个默认时间（= 现在 + 4h），让 iOS datetime-local 有可见内容
+      // 用户再根据游戏实际显示修改
       this.importForm = {
         type: 8,
-        matureAt: '',
+        matureAt: toLocalIsoForInput(new Date(Date.now() + 4 * HOUR_MS)),
         waterH: 0,
         waterM: 0,
       };
