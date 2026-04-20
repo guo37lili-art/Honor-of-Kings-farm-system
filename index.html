@@ -23,7 +23,15 @@
 
   <!-- ============== Header ============== -->
   <header class="flex items-center justify-between mb-4 pt-2">
-    <h1 class="text-xl font-bold text-emerald-700">🌱 王者农场助手</h1>
+    <div class="flex items-center gap-3">
+      <h1 class="text-xl font-bold text-emerald-700">🌱 王者农场助手</h1>
+      <template x-if="me || viewingFriend">
+        <button @click="refresh()" :disabled="refreshing"
+          class="text-sm text-emerald-600 hover:text-emerald-700 disabled:opacity-50">
+          <span x-text="refreshing ? '刷新中...' : '🔄 刷新'"></span>
+        </button>
+      </template>
+    </div>
     <div class="text-sm">
       <template x-if="me">
         <div class="flex items-center gap-2">
@@ -819,6 +827,7 @@ function app() {
     toast: '',
     // 进行中的写操作 cropId 列表，防双击产生重复浇水/收获
     busyCrops: [],
+    refreshing: false,
 
     // --- init ---
     async init() {
@@ -937,6 +946,18 @@ function app() {
       }
 
       this.crops = list;
+    },
+
+    // 手动刷新：重新拉作物列表并给玩家显式反馈
+    async refresh() {
+      if (this.refreshing) return;
+      this.refreshing = true;
+      try {
+        await this.loadCrops();
+        this.showToast('✅ 已刷新');
+      } finally {
+        this.refreshing = false;
+      }
     },
 
     get sortedCrops() {
