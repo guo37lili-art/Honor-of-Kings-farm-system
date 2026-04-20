@@ -469,6 +469,14 @@
           </template>
         </div>
 
+        <!-- 周末双倍窗口提示：最快成熟时间晚于本周五 08:00 就弹 -->
+        <template x-if="addFormDoubleWindowWarning()">
+          <div class="bg-amber-50 border border-amber-300 rounded-lg p-2.5 text-xs text-amber-800 flex items-start gap-1.5">
+            <span>⚠️</span>
+            <span>要是现在种了它，周末双倍模式首批作物可能会推迟哦！</span>
+          </div>
+        </template>
+
         <div class="flex gap-2 pt-2">
           <button @click="addOpen=false"
             class="flex-1 border border-slate-300 rounded py-2">取消</button>
@@ -793,6 +801,24 @@ function formatCountdown(ms) {
 function toLocalIsoForInput(d) {
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// 返回"下一个周五 08:00"的毫秒时间戳（本地时区）
+// 如果今天是周五且已过 08:00，返回 null 表示本周提示窗口已过（双倍窗口近在眼前或已开始）
+function nextFridayEightAM(nowMs) {
+  const d = new Date(nowMs);
+  const day = d.getDay();  // 0=周日 ... 5=周五
+  if (day === 5) {
+    const today8 = new Date(d);
+    today8.setHours(8, 0, 0, 0);
+    if (nowMs >= today8.getTime()) return null;
+    return today8.getTime();
+  }
+  const daysToFriday = (5 - day + 7) % 7;
+  const target = new Date(d);
+  target.setDate(d.getDate() + daysToFriday);
+  target.setHours(8, 0, 0, 0);
+  return target.getTime();
 }
 
 // ========== 日历订阅（.ics 生成已搬到 Supabase Edge Function）==========
@@ -1337,6 +1363,23 @@ function app() {
         { key: 'natural', emoji: '🌱', label: '自然生长',  matLabel: fmt(natMs),  colorClass: 'text-slate-700' },
       ];
     },
+    // 新种作物前的双倍窗口提示：最快成熟时间如果晚于本周五 08:00，就提示可能推迟第一批双倍
+    addFormDoubleWindowWarning() {
+      if (!this.addFormValid()) return false;
+      const friday8 = nextFridayEightAM(Date.now());
+      if (!friday8) return false;  // 本周提示窗口已过
+      const planted = new Date(this.addForm.planted_at).getTime();
+      const hpw = !!this.addForm.waterAtPlant;
+      const plantedIso = new Date(planted).toISOString();
+      const virtualCrop = {
+        type: this.addForm.type,
+        planted_at: plantedIso,
+        water_events: hpw ? [plantedIso] : [],
+      };
+      const predicted = computePredictedFastMat(virtualCrop, planted);
+      return predicted > friday8;
+    },
+
     async addCrop() {
       if (!this.me) return;
       this.loading = true;
