@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#16a34a" />
+<title>王者农场助手</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  html, body { -webkit-tap-highlight-color: transparent; }
+  [x-cloak] { display: none !important; }
+  .dryness-bar { transition: width 1s linear; }
+  @keyframes pulse-red { 0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.7);} 50%{box-shadow:0 0 0 8px rgba(239,68,68,0);} }
+  .pulse-red { animation: pulse-red 1.6s infinite; }
+</style>
+</head>
+<body class="bg-gradient-to-br from-green-50 to-emerald-100 min-h-screen text-slate-800">
+
+<div x-data="app()" x-cloak class="max-w-2xl mx-auto p-4">
+
+  <!-- ============== Header ============== -->
+  <header class="flex items-center justify-between mb-4 pt-2">
+    <h1 class="text-xl font-bold text-emerald-700">🌱 王者农场助手</h1>
+    <div class="text-sm">
+      <template x-if="me">
+        <div class="flex items-center gap-2">
+          <span class="text-slate-600">
+            <template x-if="viewingFriend"><span>看 <b x-text="viewingFriend"></b> 的农场</span></template>
+            <template x-if="!viewingFriend"><span><b x-text="me.nickname"></b></span></template>
+          </span>
+          <template x-if="!viewingFriend">
+            <button @click="logout()" class="text-red-500 hover:text-red-700">登出</button>
+          </template>
+          <template x-if="viewingFriend">
+            <button @click="backToMe()" class="text-emerald-600 hover:text-emerald-800">回自己的</button>
+          </template>
+        </div>
+      </template>
+    </div>
+  </header>
+
+  <!-- ============== Login ============== -->
+  <template x-if="!me && !viewingFriend">
+    <div class="bg-white rounded-xl shadow p-6 mt-8 space-y-4">
+      <h2 class="text-lg font-semibold text-center">登录 / 注册</h2>
+      <p class="text-xs text-slate-500 text-center">昵称不存在会自动注册。PIN 用于保护你的写操作。</p>
+      <input x-model="loginForm.nickname" type="text" placeholder="昵称"
+        class="w-full border rounded px-3 py-2 focus:outline-none focus:border-emerald-400" />
+      <input x-model="loginForm.pin" type="password" inputmode="numeric"
+        maxlength="4" pattern="\d{4}" placeholder="4 位数字 PIN"
+        class="w-full border rounded px-3 py-2 focus:outline-none focus:border-emerald-400" />
+      <button @click="login()" :disabled="loading"
+        class="w-full bg-emerald-500 hover:bg-emerald-600 text-white rounded py-2 font-semibold disabled:opacity-50">
+        <span x-text="loading ? '处理中...' : '登录 / 注册'"></span>
+      </button>
+      <template x-if="loginErr">
+        <p class="text-red-500 text-sm text-center" x-text="loginErr"></p>
+      </template>
+    </div>
+  </template>
+
+  <!-- ============== Friend View Login Prompt ============== -->
+  <template x-if="viewingFriend && !me">
+    <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center text-sm text-amber-700">
+      你正在查看 <b x-text="viewingFriend"></b> 的农场（只读）。要管理自己的农场请
+      <button @click="viewingFriend=null; updateHash()" class="text-emerald-600 underline">登录</button>
+    </div>
+  </template>
+
+  <!-- ============== Main App ============== -->
+  <template x-if="me || viewingFriend">
+    <div class="space-y-4">
+
+      <!-- Add + Import buttons -->
+      <template x-if="!viewingFriend">
+        <div class="grid grid-cols-2 gap-2">
+          <button @click="openAddModal()"
+            class="bg-white hover:bg-emerald-50 border-2 border-dashed border-emerald-300 rounded-xl py-3 text-emerald-600 font-semibold text-sm">
+            + 新种作物
+          </button>
+          <button @click="openImportModal()"
+            class="bg-white hover:bg-sky-50 border-2 border-dashed border-sky-300 rounded-xl py-3 text-sky-600 font-semibold text-sm">
+            📋 已种了怎么办
+          </button>
+        </div>
+      </template>
+
+      <!-- 作物列表 -->
+      <div class="space-y-3" id="crop-list">
+        <template x-for="crop in sortedCrops" :key="crop.id">
+          <div class="bg-white rounded-xl shadow p-4 space-y-3"
+               :class="{
+                 'ring-2 ring-red-400 pulse-red': cropState(crop).phase === 'last-water' && !viewingFriend,
+                 'ring-2 ring-amber-400': cropState(crop).phase === 'mature' && !viewingFriend
+               }">
+
+            <!-- 顶部：种类 + 时间 -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-2xl"
+                    x-text="{8:'🌾', 16:'🌽', 32:'🫐'}[crop.type]"></span>
+                  <span class="font-semibold" x-text="crop.type + 'h 作物'"></span>
+                </div>
+                <div class="text-xs text-slate-500 mt-1">
+                  种于 <span x-text="formatDateTime(crop.planted_at)"></span>
+                </div>
+              </div>
+              <template x-if="!viewingFriend">
+                <button @click="confirmDelete(crop)"
+                  class="text-slate-400 hover:text-red-500 text-sm">删除</button>
+              </template>
+            </div>
+
+            <!-- 状态分支 -->
+            <template x-if="cropState(crop).phase === 'harvested'">
+              <div class="text-center text-sm text-slate-500 py-2">
+                ✅ 已收获 · <span x-text="formatDateTime(crop.harvested_at)"></span>
+              </div>
+            </template>
+
+            <template x-if="cropState(crop).phase === 'mature'">
+              <div class="space-y-2">
+                <div class="text-center text-amber-700 font-bold">🌾 可收获</div>
+                <template x-if="!viewingFriend">
+                  <button @click="harvest(crop)"
+                    class="w-full bg-amber-500 hover:bg-amber-600 text-white rounded py-2 font-semibold">
+                    收获
+                  </button>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="cropState(crop).phase === 'last-water'">
+              <div class="space-y-2">
+                <div class="text-center">
+                  <div class="text-xs text-red-600 font-semibold mb-1">🔴 浇水即熟阶段</div>
+                  <div class="text-3xl font-mono font-bold text-red-700"
+                    x-text="formatCountdown(cropState(crop).matMs - now)"></div>
+                  <div class="text-xs text-slate-500 mt-1">
+                    现在浇水立即成熟 · 已浇 <span x-text="crop.water_events.length"></span> 次
+                  </div>
+                </div>
+                <template x-if="!viewingFriend">
+                  <button @click="waterAndHarvest(crop)"
+                    :disabled="cropState(crop).inCooldown"
+                    class="w-full bg-red-500 hover:bg-red-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded py-2 font-semibold">
+                    <template x-if="!cropState(crop).inCooldown">
+                      <span>浇水 + 收获</span>
+                    </template>
+                    <template x-if="cropState(crop).inCooldown">
+                      <span>🕐 冷却中 · <span x-text="formatCountdown(cropState(crop).cooldownEnd - now)"></span></span>
+                    </template>
+                  </button>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="cropState(crop).phase === 'normal'">
+              <div class="space-y-2">
+                <!-- 干涸度条 -->
+                <div>
+                  <div class="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>干涸度</span>
+                    <span x-text="Math.min(100, Math.round(cropState(crop).dryness*100)) + '%'"></span>
+                  </div>
+                  <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                    <div class="h-full dryness-bar"
+                      :class="{
+                        'bg-emerald-500': cropState(crop).dryness < 0.7,
+                        'bg-amber-500': cropState(crop).dryness >= 0.7 && cropState(crop).dryness < 1,
+                        'bg-red-500': cropState(crop).dryness >= 1
+                      }"
+                      :style="`width:${Math.min(100, cropState(crop).dryness*100)}%`"></div>
+                  </div>
+                </div>
+
+                <!-- 三种路径：手机端优先，浇水时机放大突出 -->
+                <div class="space-y-2">
+                  <!-- 🏃 最快路径 -->
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs font-semibold text-slate-600">
+                        🏃 最快路径<template x-if="cropState(crop).fastConverged"><span class="text-emerald-600"> · 浇水即熟</span></template>
+                      </span>
+                      <span class="text-[10px] text-slate-400">预计成熟 <span x-text="formatDateTime(cropState(crop).predictedFastMat)"></span></span>
+                    </div>
+                    <div class="flex items-baseline gap-1 flex-wrap">
+                      <span class="text-[11px] text-slate-500">浇水时机：</span>
+                      <template x-if="cropState(crop).waterNow">
+                        <span class="text-lg font-bold text-emerald-700">立刻浇水 🔥 <span class="text-[11px] font-normal text-slate-500">· 越早越好</span></span>
+                      </template>
+                      <template x-if="!cropState(crop).waterNow && cropState(crop).fastConverged">
+                        <span class="text-lg font-bold text-emerald-700">
+                          <span x-text="formatDateTime(cropState(crop).windowA)"></span>
+                          <span class="text-[11px] font-normal text-slate-500" x-text="'· 距浇水 ' + formatDuration(cropState(crop).windowA - now)"></span>
+                        </span>
+                      </template>
+                      <template x-if="!cropState(crop).waterNow && !cropState(crop).fastConverged">
+                        <span class="text-lg font-bold text-emerald-700">
+                          <span x-text="formatDateTime(cropState(crop).windowA) + ' 前'"></span>
+                          <span class="text-[11px] font-normal text-slate-500" x-text="'· 距浇水 ' + formatDuration(cropState(crop).windowA - now)"></span>
+                        </span>
+                      </template>
+                    </div>
+                    <template x-if="!cropState(crop).waterNow && cropState(crop).fastDeadZoneStart > now">
+                      <div class="text-[10px] text-emerald-700 mt-1">
+                        ⚠ <span x-text="formatDateTime(cropState(crop).fastDeadZoneStart)"></span> 后不要擅自浇水，否则进入冷却无法即熟
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- 💤 懒人路径 -->
+                  <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs font-semibold text-slate-600">💤 懒人路径 · <span class="text-amber-600">浇水即熟</span></span>
+                      <span class="text-[10px] text-slate-400">预计成熟 <span x-text="formatDateTime(cropState(crop).windowB)"></span></span>
+                    </div>
+                    <div class="flex items-baseline gap-1 flex-wrap">
+                      <span class="text-[11px] text-slate-500">浇水时机：</span>
+                      <span class="text-lg font-bold text-amber-700">
+                        <span x-text="formatDateTime(cropState(crop).windowB)"></span>
+                        <span class="text-[11px] font-normal text-slate-500" x-text="'· 距浇水 ' + formatDuration(cropState(crop).windowB - now)"></span>
+                      </span>
+                    </div>
+                    <template x-if="cropState(crop).lazyDeadZoneStart > now">
+                      <div class="text-[10px] text-amber-600 mt-1">
+                        ⚠ <span x-text="formatDateTime(cropState(crop).lazyDeadZoneStart)"></span> 后不要擅自浇水，否则进入冷却无法即熟
+                      </div>
+                    </template>
+                  </div>
+
+                  <!-- 🌱 自然生长 -->
+                  <div class="bg-slate-50 border border-slate-200 rounded-lg p-3">
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs font-semibold text-slate-600">🌱 自然生长</span>
+                      <span class="text-[10px] text-slate-400">
+                        预计成熟 <span x-text="formatDateTime(cropState(crop).matMs)"></span>
+                        <span x-text="'· 距成熟 ' + formatDuration(cropState(crop).matMs - now)"></span>
+                      </span>
+                    </div>
+                    <div class="flex items-baseline gap-1">
+                      <span class="text-[11px] text-slate-500">浇水时机：</span>
+                      <span class="text-lg font-bold text-slate-600">不再浇水</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 实时浇水效果 -->
+                <div class="text-[11px] text-slate-400">
+                  已浇 <span x-text="crop.water_events.length"></span> 次
+                  <template x-if="cropState(crop).waterReductionMs > 0">
+                    <span>· 💧 现在浇水可减 <span class="text-emerald-600 font-semibold" x-text="formatDuration(cropState(crop).waterReductionMs)"></span></span>
+                  </template>
+                </div>
+
+                <template x-if="!viewingFriend">
+                  <button @click="water(crop)"
+                    :disabled="cropState(crop).inCooldown"
+                    class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded py-2 font-semibold">
+                    <template x-if="!cropState(crop).inCooldown">
+                      <span>浇水</span>
+                    </template>
+                    <template x-if="cropState(crop).inCooldown">
+                      <span>🕐 冷却中 · <span x-text="formatCountdown(cropState(crop).cooldownEnd - now)"></span></span>
+                    </template>
+                  </button>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="cropState(crop).phase === 'nowater'">
+              <div class="text-center text-sm space-y-1">
+                <div class="text-slate-600">🌱 自然生长中</div>
+                <div class="text-xs text-slate-500">
+                  成熟：<span class="font-semibold" x-text="formatDateTime(cropState(crop).matMs)"></span>
+                </div>
+                <div class="text-xs text-slate-400" x-text="'还有 ' + formatDuration(cropState(crop).matMs - now)"></div>
+              </div>
+            </template>
+
+          </div>
+        </template>
+
+        <template x-if="crops.length === 0">
+          <div class="text-center text-slate-400 py-12">
+            <div class="text-4xl mb-2">🪴</div>
+            <div x-text="viewingFriend ? '这里还没有作物' : '还没种作物，点上面 + 添加一个吧'"></div>
+          </div>
+        </template>
+      </div>
+
+    </div>
+  </template>
+
+  <!-- ============== Add Modal ============== -->
+  <template x-if="addOpen">
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+         @click.self="addOpen=false">
+      <div class="bg-white rounded-xl p-5 w-full max-w-md space-y-4">
+        <h3 class="font-semibold text-lg">添加作物</h3>
+
+        <div>
+          <label class="text-sm text-slate-600">种类</label>
+          <div class="grid grid-cols-3 gap-2 mt-1">
+            <template x-for="t in [8,16,32]" :key="t">
+              <button @click="addForm.type = t"
+                :class="addForm.type===t ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-700'"
+                class="py-2 rounded font-semibold"
+                x-text="t + 'h'"></button>
+            </template>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-sm text-slate-600">种植时间</label>
+          <div class="flex gap-2 mt-1">
+            <input type="datetime-local" x-model="addForm.planted_at"
+              class="flex-1 border rounded px-3 py-2 min-w-0" />
+            <button @click="addForm.planted_at = toLocalIsoForInput(new Date())"
+              class="px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded text-sm whitespace-nowrap">
+              当前时间
+            </button>
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" x-model="addForm.waterAtPlant" class="w-4 h-4" />
+          <span>种植时同时完成第一次浇水</span>
+        </label>
+
+        <!-- 实时预览：三路径预计成熟时间 -->
+        <div class="bg-slate-50 border border-slate-200 rounded p-3 space-y-1.5 text-xs">
+          <div class="text-slate-500 text-[11px] mb-1">📅 预计成熟（根据当前选项）</div>
+          <template x-for="p in addFormPreviewPaths()" :key="p.key">
+            <div class="flex items-baseline justify-between">
+              <span class="text-slate-600" x-text="p.emoji + ' ' + p.label"></span>
+              <span class="font-semibold" :class="p.colorClass" x-text="p.matLabel"></span>
+            </div>
+          </template>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button @click="addOpen=false"
+            class="flex-1 border border-slate-300 rounded py-2">取消</button>
+          <button @click="addCrop()" :disabled="loading || !addFormValid()"
+            class="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded py-2 font-semibold">添加</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============== Import Modal（已经种了） ============== -->
+  <template x-if="importOpen">
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+         @click.self="importOpen=false">
+      <div class="bg-white rounded-xl p-5 w-full max-w-md space-y-4">
+        <h3 class="font-semibold text-lg">📋 已种了怎么办</h3>
+        <p class="text-xs text-slate-500">把游戏里看到的信息填进来，自动推算三路径</p>
+
+        <div>
+          <label class="text-sm text-slate-600">作物类型</label>
+          <div class="grid grid-cols-3 gap-2 mt-1">
+            <template x-for="t in [8,16,32]" :key="t">
+              <button @click="importForm.type = t"
+                :class="importForm.type===t ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-700'"
+                class="py-2 rounded font-semibold"
+                x-text="t + 'h'"></button>
+            </template>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-sm text-slate-600">游戏显示的成熟时间</label>
+          <input type="datetime-local" x-model="importForm.matureAt"
+            class="w-full border rounded px-3 py-2 mt-1" />
+        </div>
+
+        <div>
+          <label class="text-sm text-slate-600">水分剩余时间</label>
+          <div class="flex items-center gap-2 mt-1">
+            <input type="number" min="0" max="99" x-model.number="importForm.waterH"
+              class="w-16 border rounded px-2 py-2 text-center" />
+            <span class="text-slate-500 text-sm">h</span>
+            <input type="number" min="0" max="59" x-model.number="importForm.waterM"
+              class="w-16 border rounded px-2 py-2 text-center" />
+            <span class="text-slate-500 text-sm">min</span>
+            <span class="text-[11px] text-slate-400 ml-2">到 0 土地完全干涸</span>
+          </div>
+        </div>
+
+        <!-- 实时预览：三路径预计成熟时间 -->
+        <div class="bg-slate-50 border border-slate-200 rounded p-3 space-y-1.5 text-xs">
+          <div class="text-slate-500 text-[11px] mb-1">📅 预计成熟（根据当前状态）</div>
+          <template x-for="p in importPreviewPaths()" :key="p.key">
+            <div class="flex items-baseline justify-between">
+              <span class="text-slate-600" x-text="p.emoji + ' ' + p.label"></span>
+              <span class="font-semibold" :class="p.colorClass" x-text="p.matLabel"></span>
+            </div>
+          </template>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button @click="importOpen=false"
+            class="flex-1 border border-slate-300 rounded py-2">取消</button>
+          <button @click="submitImport()" :disabled="loading || !importFormValid()"
+            class="flex-1 bg-sky-500 hover:bg-sky-600 disabled:opacity-50 text-white rounded py-2 font-semibold">添加到列表</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============== Delete Confirm Modal ============== -->
+  <template x-if="deleteTarget">
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+         @click.self="deleteTarget=null">
+      <div class="bg-white rounded-xl p-5 w-full max-w-sm space-y-4">
+        <h3 class="font-semibold">确认删除？</h3>
+        <p class="text-sm text-slate-600">
+          删除后不可恢复。<br>
+          <span x-text="deleteTarget.type + 'h 作物，种于 ' + formatDateTime(deleteTarget.planted_at)"></span>
+        </p>
+        <div class="flex gap-2">
+          <button @click="deleteTarget=null" class="flex-1 border border-slate-300 rounded py-2">取消</button>
+          <button @click="deleteCrop(deleteTarget)"
+            class="flex-1 bg-red-500 hover:bg-red-600 text-white rounded py-2 font-semibold">删除</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============== Toast ============== -->
+  <template x-if="toast">
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white rounded-full px-4 py-2 text-sm shadow-lg z-50"
+         x-text="toast"></div>
+  </template>
+
+</div>
+
+<!-- ============== App JS ============== -->
+<script>
+
+// ========== CONFIG ==========
+// Supabase 项目配置
+const SUPABASE_URL = 'https://eebimxoefmibbxxtmebp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlYmlteG9lZm1pYmJ4eHRtZWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NDIzNzQsImV4cCI6MjA5MjIxODM3NH0.zfHwvQ_o17Q10ZovGdWy9uNzhL_FsD463rUnDpNN180';
+
+// 模块级 Supabase 客户端 —— 不放进 Alpine 响应式 state，避免 Proxy 包装破坏内部私有字段
+let sbClient = null;
+
+// ========== 核心时间算法 ==========
+
+const HOUR_MS = 3600 * 1000;
+
+function computeMatTime(crop) {
+  const T = crop.type * HOUR_MS;
+  const planted = new Date(crop.planted_at).getTime();
+  const waters = (crop.water_events || []).map(t => new Date(t).getTime());
+  if (waters.length === 0) return planted + T;
+  let reduction = T / 12;                     // 首次 d=1
+  for (let i = 1; i < waters.length; i++) {
+    const gap = waters[i] - waters[i-1];
+    const d = Math.min(1, 3 * gap / T);
+    reduction += d * T / 12;
+  }
+  return planted + T - reduction;
+}
+
+// 模拟"现在浇一次"的效果：新 mat、减少多少、是否触发即熟
+// 冷却期内不能浇水，wouldMature 直接 false
+function previewWaterEffect(crop, now) {
+  const currentMat = computeMatTime(crop);
+  const cooldownEnd = cooldownEndAt(crop);
+  const inCooldown = now < cooldownEnd;
+
+  if (inCooldown) {
+    return { currentMat, newMat: currentMat, reductionMs: 0, wouldMature: false, inCooldown: true };
+  }
+
+  const newCrop = {
+    ...crop,
+    water_events: [...(crop.water_events || []), new Date(now).toISOString()],
+  };
+  const newMat = computeMatTime(newCrop);
+  return {
+    currentMat,
+    newMat,
+    reductionMs: Math.max(0, currentMat - newMat),
+    wouldMature: newMat <= now,
+    inCooldown: false,
+  };
+}
+
+// 游戏规则：任意两次浇水之间的冷却时间 = T/30
+// 8h → 16min · 16h → 32min · 32h → 64min
+function cooldownMs(crop) {
+  return crop.type * HOUR_MS / 30;
+}
+
+// 冷却结束时刻（可以再次浇水的最早时间）
+function cooldownEndAt(crop) {
+  const waters = (crop.water_events || []).map(t => new Date(t).getTime());
+  if (waters.length === 0) return -Infinity;
+  return waters[waters.length - 1] + cooldownMs(crop);
+}
+
+// Window A：最快路径下次浇水的截止时刻
+// - 0 次浇水：返回 now（应该立刻浇水，每延迟 1 秒预计成熟就推后 0.2 秒）
+// - 否则：lastEvent + T/3（过此满干涸浪费）
+// - 上限：不超过 current_mat 和 Window B（过了这些 deadline 已无意义）
+function computeWindowA(crop, now) {
+  const T = crop.type * HOUR_MS;
+  const planted = new Date(crop.planted_at).getTime();
+  const waters = (crop.water_events || []).map(t => new Date(t).getTime());
+  const nowMs = now ?? Date.now();
+
+  if (waters.length === 0) {
+    return nowMs;  // 立刻浇水
+  }
+
+  const lastEvent = waters[waters.length - 1];
+  const deadline = lastEvent + T / 3;
+  const currentMat = computeMatTime(crop);
+  const windowB = computeWindowB(crop);
+  return Math.min(deadline, currentMat, windowB);
+}
+
+// 最快路径预计成熟时间：从当前状态严格按 Window A 节奏浇水的最终成熟时刻
+// 公式核心：τ_N = (4·current_mat + lastEvent) / 5
+// 修正项 1：0 次浇水 → 虚拟 "此刻浇首次水" 以包含 T/12 奖励
+// 修正项 2：已超过 T/3 后仍未浇（土地干涸浪费）→ 加 waste/5 延后
+function computePredictedFastMat(crop, now) {
+  const T = crop.type * HOUR_MS;
+  const planted = new Date(crop.planted_at).getTime();
+  const waters = (crop.water_events || []).map(t => new Date(t).getTime());
+  const currentMat = computeMatTime(crop);
+  const nowMs = now ?? Date.now();
+
+  let baseFormula, waste = 0;
+  if (waters.length === 0) {
+    // 未浇水：虚拟 nowMs 时刻浇的首次水（d=1 奖励）
+    const effectiveMat = (planted + T) - T / 12;
+    baseFormula = (4 * effectiveMat + nowMs) / 5;
+  } else {
+    const lastEvent = waters[waters.length - 1];
+    baseFormula = (4 * currentMat + lastEvent) / 5;
+    // 上一次浇水到现在若超过 T/3，这部分时间是土地满干涸白过
+    waste = Math.max(0, nowMs - lastEvent - T / 3);
+  }
+
+  const predicted = baseFormula + waste / 5;
+  return Math.min(predicted, currentMat);
+}
+
+// Window B：懒人路径——在此时刻浇一次水即可触发即熟
+// 若 gap < T/3 分支有解：B = (4·current_mat + lastEvent) / 5
+// 否则：B = max(lastEvent + T/3, current_mat − T/12)
+// 冷却约束：B ≥ lastEvent + T/30（如已有浇水记录）
+function computeWindowB(crop) {
+  const T = crop.type * HOUR_MS;
+  const planted = new Date(crop.planted_at).getTime();
+  const waters = (crop.water_events || []).map(t => new Date(t).getTime());
+  const lastEvent = waters.length > 0 ? waters[waters.length - 1] : planted;
+  const currentMat = computeMatTime(crop);
+
+  // 分支 A: τ - lastEvent < T/3
+  const tauA = (4 * currentMat + lastEvent) / 5;
+  let rawB;
+  if (tauA < lastEvent + T / 3) {
+    rawB = tauA;
+  } else {
+    // 分支 B: τ - lastEvent >= T/3（干涸度已满 1，d=1 可最大减 T/12）
+    rawB = Math.max(lastEvent + T / 3, currentMat - T / 12);
+  }
+
+  // 冷却约束：有浇水记录时必须 ≥ lastEvent + T/30
+  if (waters.length > 0) {
+    return Math.max(rawB, lastEvent + cooldownMs(crop));
+  }
+  return rawB;
+}
+
+// 干涸度：从上次浇水到 now 占 T/3 的比例
+function computeDryness(crop, now) {
+  const T = crop.type * HOUR_MS;
+  const waters = (crop.water_events || []).map(t => new Date(t).getTime());
+  const planted = new Date(crop.planted_at).getTime();
+  const last = waters.length > 0 ? waters[waters.length - 1] : planted;
+  // 没浇过水：土地默认"干"，显示 100%
+  if (waters.length === 0) return 1;
+  return (now - last) / (T / 3);
+}
+
+// ========== Helpers ==========
+
+function formatDateTime(ts) {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  const now = new Date();
+  const opts = { hour: '2-digit', minute: '2-digit' };
+  const sameDay = d.toDateString() === now.toDateString();
+  const tomorrow = new Date(now.getTime() + 86400000).toDateString() === d.toDateString();
+  if (sameDay) return '今 ' + d.toLocaleTimeString('zh-CN', opts);
+  if (tomorrow) return '明 ' + d.toLocaleTimeString('zh-CN', opts);
+  return d.toLocaleDateString('zh-CN', {month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('zh-CN', opts);
+}
+
+function formatDuration(ms) {
+  if (ms < 0) return '已过';
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}h ${m}min`;
+  if (m > 0) return `${m}min`;
+  return `${s}s`;
+}
+
+function formatCountdown(ms) {
+  if (ms < 0) return '00:00';
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
+function toLocalIsoForInput(d) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// ========== Alpine App ==========
+
+function app() {
+  return {
+    // --- state ---
+    me: null,                    // { nickname, pin_hash }
+    viewingFriend: null,         // nickname string when looking at /#/u/xxx
+    crops: [],
+    now: Date.now(),
+    loading: false,
+
+    loginForm: { nickname: '', pin: '' },
+    loginErr: '',
+
+    addOpen: false,
+    addForm: {
+      type: 8,
+      planted_at: '',
+      waterAtPlant: true,
+    },
+
+    importOpen: false,
+    importForm: {
+      type: 8,
+      matureAt: '',
+      waterH: 0,
+      waterM: 0,
+    },
+
+    deleteTarget: null,
+    toast: '',
+
+    // --- init ---
+    async init() {
+      if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+        alert('Supabase 库没加载成功，检查网络或 CDN 可达性');
+        return;
+      }
+      sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      const saved = localStorage.getItem('wz_me');
+      if (saved) {
+        try { this.me = JSON.parse(saved); } catch {}
+      }
+
+      this.parseHash();
+      window.addEventListener('hashchange', () => this.parseHash());
+
+      await this.loadCrops();
+
+      setInterval(() => { this.now = Date.now(); }, 1000);
+    },
+
+    // --- routing ---
+    parseHash() {
+      const h = location.hash || '#/';
+      const m = h.match(/^#\/u\/([^/]+)/);
+      if (m) {
+        this.viewingFriend = decodeURIComponent(m[1]);
+      } else {
+        this.viewingFriend = null;
+      }
+      this.loadCrops();
+    },
+    updateHash() {
+      if (this.viewingFriend) {
+        location.hash = '#/u/' + encodeURIComponent(this.viewingFriend);
+      } else {
+        location.hash = '#/';
+      }
+    },
+    backToMe() {
+      this.viewingFriend = null;
+      location.hash = '#/';
+      this.loadCrops();
+    },
+
+    // --- auth ---
+    async login() {
+      this.loginErr = '';
+      const nick = this.loginForm.nickname.trim();
+      const pin = this.loginForm.pin.trim();
+      if (!nick) { this.loginErr = '请输入昵称'; return; }
+      if (nick.length > 20) { this.loginErr = '昵称太长（≤20 字符）'; return; }
+      if (!/^\d{4}$/.test(pin)) { this.loginErr = 'PIN 必须是 4 位数字'; return; }
+
+      this.loading = true;
+      try {
+        // 服务端用 pgcrypto bcrypt 做 hash 比对，返回 stored_hash 作为后续写操作的 token
+        const { data, error } = await sbClient
+          .rpc('auth_login', { p_nickname: nick, p_pin: pin });
+
+        if (error) throw error;
+
+        if (data && typeof data === 'string') {
+          this.me = { nickname: nick, pin_hash: data };
+          localStorage.setItem('wz_me', JSON.stringify(this.me));
+          this.loginForm = { nickname: '', pin: '' };
+          await this.loadCrops();
+        } else {
+          this.loginErr = '昵称或 PIN 错误';
+        }
+      } catch (e) {
+        this.loginErr = '登录失败：' + (e.message || e);
+      } finally {
+        this.loading = false;
+      }
+    },
+    logout() {
+      localStorage.removeItem('wz_me');
+      this.me = null;
+      this.crops = [];
+    },
+
+    // --- crops ---
+    async loadCrops() {
+      const owner = this.viewingFriend || this.me?.nickname;
+      if (!owner) { this.crops = []; return; }
+      const { data, error } = await sbClient
+        .from('crops')
+        .select('*')
+        .eq('user_nickname', owner)
+        .order('planted_at', { ascending: false });
+      if (!error) this.crops = data || [];
+    },
+
+    get sortedCrops() {
+      // 未熟在前（按下次浇水 / 截止时间升序），已熟在后，已收获最后
+      return [...this.crops].sort((a, b) => {
+        const sa = this.cropState(a), sb = this.cropState(b);
+        const rank = { 'last-water':0, 'normal':1, 'nowater':2, 'mature':3, 'harvested':4 };
+        if (rank[sa.phase] !== rank[sb.phase]) return rank[sa.phase] - rank[sb.phase];
+        return (sa.nextTarget || sa.matMs || 0) - (sb.nextTarget || sb.matMs || 0);
+      });
+    },
+
+    // --- crop state (派生) ---
+    cropState(crop) {
+      const now = this.now;
+      const matMs = computeMatTime(crop);
+      const events = crop.water_events || [];
+      const dryness = computeDryness(crop, now);
+
+      if (crop.harvested_at) {
+        return { phase: 'harvested', matMs };
+      }
+      if (now >= matMs) {
+        return { phase: 'mature', matMs };
+      }
+
+      const windowA = computeWindowA(crop, now);
+      const windowB = computeWindowB(crop);
+      const predictedFastMat = computePredictedFastMat(crop, now);
+      const preview = previewWaterEffect(crop, now);
+      const cooldownEnd = cooldownEndAt(crop);
+      const inCooldown = now < cooldownEnd;
+      const cdMs = cooldownMs(crop);
+      const cooldownMinLabel = Math.round(cdMs / 60000);
+      // 0 浇水时：最快路径的最优行动是"立刻浇水"
+      const waterNow = events.length === 0;
+      // 冷却死区（此时刻之后浇水会被冷却挡住即熟）
+      const fastDeadZoneStart = predictedFastMat - cdMs;
+      const lazyDeadZoneStart = windowB - cdMs;
+      // 最快与懒人路径是否已收敛（Window A 被 Window B 上限 cap 后相等）
+      const fastConverged = !waterNow && Math.abs(windowA - windowB) < 1000;
+
+      // 已进入"浇水即熟"阶段（冷却未生效时才能触发）
+      if (preview.wouldMature) {
+        return {
+          phase: 'last-water',
+          matMs,
+          dryness,
+          waterReductionMs: preview.reductionMs,
+          windowA,
+          windowB,
+          predictedFastMat,
+          cooldownEnd,
+          inCooldown,
+          cooldownMinLabel,
+          cooldownMsVal: cdMs,
+          waterNow,
+          fastDeadZoneStart,
+          lazyDeadZoneStart,
+          fastConverged,
+        };
+      }
+
+      return {
+        phase: 'normal',
+        matMs,
+        dryness,
+        windowA,
+        windowB,
+        predictedFastMat,
+        waterReductionMs: preview.reductionMs,
+        waterCount: events.length,
+        cooldownEnd,
+        inCooldown,
+        cooldownMinLabel,
+        cooldownMsVal: cdMs,
+        waterNow,
+        fastDeadZoneStart,
+        lazyDeadZoneStart,
+        fastConverged,
+      };
+    },
+
+    // --- Add Modal ---
+    openAddModal() {
+      this.addForm = {
+        type: 8,
+        planted_at: toLocalIsoForInput(new Date()),
+        waterAtPlant: true,
+      };
+      this.addOpen = true;
+    },
+    addFormValid() {
+      return !!this.addForm.planted_at;
+    },
+
+    // --- Import Modal（已种了怎么办） ---
+    openImportModal() {
+      this.importForm = {
+        type: 8,
+        matureAt: '',
+        waterH: 0,
+        waterM: 0,
+      };
+      this.importOpen = true;
+    },
+    importFormValid() {
+      if (!this.importForm.matureAt) return false;
+      const matureAt = new Date(this.importForm.matureAt).getTime();
+      if (isNaN(matureAt) || matureAt <= Date.now()) return false;
+      const T = this.importForm.type * HOUR_MS;
+      const waterRemaining = this.importWaterRemainingMs();
+      if (waterRemaining < 0 || waterRemaining > T / 3) return false;
+      return true;
+    },
+    importWaterRemainingMs() {
+      const h = Number(this.importForm.waterH) || 0;
+      const m = Number(this.importForm.waterM) || 0;
+      return (h * 60 + m) * 60 * 1000;
+    },
+    // 根据输入构造虚拟 crop（一次浇水状态，保证 computeMatTime = 用户填的 matureAt）
+    buildImportedVirtualCrop() {
+      const T = this.importForm.type * HOUR_MS;
+      const matureAt = new Date(this.importForm.matureAt).getTime();
+      const waterRemaining = this.importWaterRemainingMs();
+      const now = Date.now();
+      const lastEvent = now + waterRemaining - T / 3;
+      const planted = matureAt - 11 * T / 12;
+      return {
+        type: this.importForm.type,
+        planted_at: new Date(planted).toISOString(),
+        water_events: [new Date(lastEvent).toISOString()],
+      };
+    },
+    importPreviewPaths() {
+      const blank = [
+        { key: 'fast',    emoji: '🏃', label: '最快路径',  matLabel: '--', colorClass: 'text-slate-400' },
+        { key: 'lazy',    emoji: '💤', label: '懒人路径',  matLabel: '--', colorClass: 'text-slate-400' },
+        { key: 'natural', emoji: '🌱', label: '自然生长',  matLabel: '--', colorClass: 'text-slate-400' },
+      ];
+      if (!this.importFormValid()) return blank;
+      const crop = this.buildImportedVirtualCrop();
+      const now = Date.now();
+      const fastMs = computePredictedFastMat(crop, now);
+      const lazyMs = computeWindowB(crop);
+      const natMs  = computeMatTime(crop);
+      const fmt = (ms) => formatDateTime(ms) + `（${formatDuration(ms - now)}后）`;
+      return [
+        { key: 'fast',    emoji: '🏃', label: '最快路径',  matLabel: fmt(fastMs), colorClass: 'text-emerald-700' },
+        { key: 'lazy',    emoji: '💤', label: '懒人路径 · 浇水即熟', matLabel: fmt(lazyMs), colorClass: 'text-amber-700' },
+        { key: 'natural', emoji: '🌱', label: '自然生长',  matLabel: fmt(natMs),  colorClass: 'text-slate-700' },
+      ];
+    },
+    async submitImport() {
+      if (!this.me) return;
+      this.loading = true;
+      try {
+        const virtualCrop = this.buildImportedVirtualCrop();
+        const payload = {
+          type: virtualCrop.type,
+          planted_at: virtualCrop.planted_at,
+          mode: 'fast',
+          water_events: virtualCrop.water_events,
+        };
+        const { data, error } = await sbClient.rpc('crop_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'insert',
+          p_crop_id: null,
+          p_payload: payload,
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.importOpen = false;
+        this.showToast('已导入');
+        await this.loadCrops();
+      } catch (e) {
+        alert('添加失败：' + (e.message || e));
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    // 添加 modal 里的三路径预览
+    addFormPreviewPaths() {
+      if (!this.addForm.planted_at) {
+        return [
+          { key: 'fast',    emoji: '🏃', label: '最快路径',  matLabel: '--', colorClass: 'text-slate-400' },
+          { key: 'lazy',    emoji: '💤', label: '懒人路径',  matLabel: '--', colorClass: 'text-slate-400' },
+          { key: 'natural', emoji: '🌱', label: '自然生长',  matLabel: '--', colorClass: 'text-slate-400' },
+        ];
+      }
+      const T = this.addForm.type * HOUR_MS;
+      const planted = new Date(this.addForm.planted_at).getTime();
+      const hpw = !!this.addForm.waterAtPlant;
+
+      // 虚拟 crop（模拟种植完成后的初始状态）
+      const plantedIso = new Date(planted).toISOString();
+      const virtualCrop = {
+        type: this.addForm.type,
+        planted_at: plantedIso,
+        water_events: hpw ? [plantedIso] : [],
+      };
+
+      const fastMs = computePredictedFastMat(virtualCrop, planted);
+      const lazyMs = computeWindowB(virtualCrop);
+      const natMs  = computeMatTime(virtualCrop);
+
+      const fmt = (ms) => formatDateTime(ms) + `（${formatDuration(ms - planted)}后）`;
+      return [
+        { key: 'fast',    emoji: '🏃', label: '最快路径',  matLabel: fmt(fastMs), colorClass: 'text-emerald-700' },
+        { key: 'lazy',    emoji: '💤', label: '懒人路径',  matLabel: fmt(lazyMs), colorClass: 'text-amber-700' },
+        { key: 'natural', emoji: '🌱', label: '自然生长',  matLabel: fmt(natMs),  colorClass: 'text-slate-700' },
+      ];
+    },
+    async addCrop() {
+      if (!this.me) return;
+      this.loading = true;
+      try {
+        const planted = new Date(this.addForm.planted_at).toISOString();
+        const hpw = !!this.addForm.waterAtPlant;
+        const payload = {
+          type: this.addForm.type,
+          planted_at: planted,
+          mode: 'fast',   // schema 兼容占位，runtime 不再使用
+          water_events: hpw ? [planted] : [],
+        };
+        const { data, error } = await sbClient.rpc('crop_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'insert',
+          p_crop_id: null,
+          p_payload: payload,
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.addOpen = false;
+        this.showToast('已添加');
+        await this.loadCrops();
+      } catch (e) {
+        alert('添加失败：' + (e.message || e));
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    // --- actions ---
+    async water(crop) {
+      if (!this.me) return;
+      if (Date.now() < cooldownEndAt(crop)) {
+        this.showToast('冷却中，无法浇水');
+        return;
+      }
+      const now = new Date().toISOString();
+      try {
+        const { data, error } = await sbClient.rpc('crop_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'water',
+          p_crop_id: crop.id,
+          p_payload: { at: now },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast('已浇水');
+        await this.loadCrops();
+      } catch (e) {
+        alert('浇水失败：' + (e.message || e));
+      }
+    },
+
+    async waterAndHarvest(crop) {
+      if (!this.me) return;
+      if (Date.now() < cooldownEndAt(crop)) {
+        this.showToast('冷却中，无法浇水');
+        return;
+      }
+      const now = new Date().toISOString();
+      try {
+        const { data, error } = await sbClient.rpc('crop_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'water_and_harvest',
+          p_crop_id: crop.id,
+          p_payload: { at: now },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast('🌾 已收获');
+        await this.loadCrops();
+      } catch (e) {
+        alert('收获失败：' + (e.message || e));
+      }
+    },
+
+    async harvest(crop) {
+      if (!this.me) return;
+      const now = new Date().toISOString();
+      try {
+        const { data, error } = await sbClient.rpc('crop_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'harvest',
+          p_crop_id: crop.id,
+          p_payload: { at: now },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast('🌾 已收获');
+        await this.loadCrops();
+      } catch (e) {
+        alert('收获失败：' + (e.message || e));
+      }
+    },
+
+    confirmDelete(crop) {
+      this.deleteTarget = crop;
+    },
+    async deleteCrop(crop) {
+      if (!this.me) return;
+      try {
+        const { data, error } = await sbClient.rpc('crop_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'delete',
+          p_crop_id: crop.id,
+          p_payload: {},
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.deleteTarget = null;
+        this.showToast('已删除');
+        await this.loadCrops();
+      } catch (e) {
+        alert('删除失败：' + (e.message || e));
+      }
+    },
+
+    // --- UI helpers ---
+    showToast(msg) {
+      this.toast = msg;
+      setTimeout(() => { this.toast = ''; }, 2000);
+    },
+    formatDateTime(ts) { return formatDateTime(ts); },
+    formatDuration(ms) { return formatDuration(ms); },
+    formatCountdown(ms) { return formatCountdown(ms); },
+  };
+}
+
+// ========== 自测（浏览器 Console 可看） ==========
+window.__farmTests = function() {
+  const T = 8 * HOUR_MS;
+  const t0 = Date.now();
+  const tests = [
+    {
+      name: '空浇水 → mat = T',
+      actual: computeMatTime({ type: 8, planted_at: t0, water_events: [] }) - t0,
+      expected: T,
+    },
+    {
+      name: 'Fast 4 次浇水 → 11T/15',
+      actual: computeMatTime({ type: 8, planted_at: t0, water_events: [
+        t0, t0 + T/3, t0 + 2*T/3, t0 + 11*T/15
+      ]}) - t0,
+      expected: 11*T/15,
+    },
+    {
+      name: 'Lazy 2 次浇水 → 5T/6',
+      actual: computeMatTime({ type: 8, planted_at: t0, water_events: [t0, t0 + 5*T/6] }) - t0,
+      expected: 5*T/6,
+    },
+    {
+      name: '单次浇水任意时刻 → 11T/12 (首次 d=1)',
+      actual: computeMatTime({ type: 8, planted_at: t0, water_events: [t0 + T/4] }) - t0,
+      expected: 11*T/12,
+    },
+  ];
+  let pass = 0;
+  tests.forEach(t => {
+    const ok = Math.abs(t.actual - t.expected) < 2;
+    console[ok ? 'log' : 'error'](`${ok?'✅':'❌'} ${t.name}`, {actual: t.actual, expected: t.expected});
+    if (ok) pass++;
+  });
+  console.log(`\n${pass}/${tests.length} passed`);
+};
+</script>
+</body>
+</html>
