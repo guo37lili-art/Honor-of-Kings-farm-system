@@ -679,8 +679,8 @@ function cooldownEndAt(crop) {
 // - 0 次浇水：返回 now（应该立刻浇水，每延迟 1 秒预计成熟就推后 0.2 秒）
 // - 否则：lastEvent + T/3（过此满干涸浪费）
 // - 上限：不超过 current_mat 和 Window B（过了这些 deadline 已无意义）
-// - 冷却锁定情况：若浇水节奏不完美导致连续模型 predicted < windowB，
-//   最后一次即熟水打不出（冷却 lock），最快路径无优势，下次浇水直接退化到 windowB
+// - 冷却约束：若最终成熟还需多次浇水（predicted < windowB），倒数第二次浇水必须在
+//   predictedFastMat - T/30 之前完成，否则冷却期会挡住即熟水。和 fastForbidStart 语义一致
 function computeWindowA(crop, now) {
   const T = crop.type * HOUR_MS;
   const planted = new Date(crop.planted_at).getTime();
@@ -696,14 +696,15 @@ function computeWindowA(crop, now) {
   const currentMat = computeMatTime(crop);
   const windowB = computeWindowB(crop);
 
-  // 冷却锁定检测（与 computePredictedFastMat 的 clamp 对称）
+  // 推算 predictedFastMat（与 computePredictedFastMat 同公式，避免循环引用就地算一份）
   const baseFormula = (4 * currentMat + lastEvent) / 5;
   const waste = Math.max(0, nowMs - lastEvent - T / 3);
   const predicted = baseFormula + waste / 5;
-  if (predicted < windowB) {
-    return windowB;  // 冷却 lock，下次浇水直接按懒人路径时机走
-  }
 
+  // 只在"多次浇水路径"下才用冷却约束收紧 windowA；windowB==predicted 时是单次浇水即熟，不适用
+  if (windowB - predicted > 1000) {
+    return Math.min(deadline, currentMat, windowB, predicted - T / 30);
+  }
   return Math.min(deadline, currentMat, windowB);
 }
 
@@ -732,14 +733,7 @@ function computePredictedFastMat(crop, now) {
 
   const predicted = baseFormula + waste / 5;
   // 防御：不能比自然成熟更晚，也不能回到过去（now 之前）
-  let result = Math.max(nowMs, Math.min(predicted, currentMat));
-  // 冷却约束补丁：当浇水节奏不完美（gap < T/3 → currentMat 偏大），连续模型低估最终成熟时刻
-  // 冷却 T/30 会让"最后一次浇水"来不及，作物提前自然成熟。最快路径不可能比 windowB 还早
-  if (waters.length > 0) {
-    const wB = computeWindowB(crop);
-    result = Math.max(result, Math.min(wB, currentMat));
-  }
-  return result;
+  return Math.max(nowMs, Math.min(predicted, currentMat));
 }
 
 // Window B：懒人路径——在此时刻浇一次水即可触发即熟
