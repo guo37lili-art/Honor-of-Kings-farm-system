@@ -679,6 +679,8 @@ function cooldownEndAt(crop) {
 // - 0 次浇水：返回 now（应该立刻浇水，每延迟 1 秒预计成熟就推后 0.2 秒）
 // - 否则：lastEvent + T/3（过此满干涸浪费）
 // - 上限：不超过 current_mat 和 Window B（过了这些 deadline 已无意义）
+// - 冷却锁定情况：若浇水节奏不完美导致连续模型 predicted < windowB，
+//   最后一次即熟水打不出（冷却 lock），最快路径无优势，下次浇水直接退化到 windowB
 function computeWindowA(crop, now) {
   const T = crop.type * HOUR_MS;
   const planted = new Date(crop.planted_at).getTime();
@@ -693,6 +695,15 @@ function computeWindowA(crop, now) {
   const deadline = lastEvent + T / 3;
   const currentMat = computeMatTime(crop);
   const windowB = computeWindowB(crop);
+
+  // 冷却锁定检测（与 computePredictedFastMat 的 clamp 对称）
+  const baseFormula = (4 * currentMat + lastEvent) / 5;
+  const waste = Math.max(0, nowMs - lastEvent - T / 3);
+  const predicted = baseFormula + waste / 5;
+  if (predicted < windowB) {
+    return windowB;  // 冷却 lock，下次浇水直接按懒人路径时机走
+  }
+
   return Math.min(deadline, currentMat, windowB);
 }
 
@@ -721,7 +732,14 @@ function computePredictedFastMat(crop, now) {
 
   const predicted = baseFormula + waste / 5;
   // 防御：不能比自然成熟更晚，也不能回到过去（now 之前）
-  return Math.max(nowMs, Math.min(predicted, currentMat));
+  let result = Math.max(nowMs, Math.min(predicted, currentMat));
+  // 冷却约束补丁：当浇水节奏不完美（gap < T/3 → currentMat 偏大），连续模型低估最终成熟时刻
+  // 冷却 T/30 会让"最后一次浇水"来不及，作物提前自然成熟。最快路径不可能比 windowB 还早
+  if (waters.length > 0) {
+    const wB = computeWindowB(crop);
+    result = Math.max(result, Math.min(wB, currentMat));
+  }
+  return result;
 }
 
 // Window B：懒人路径——在此时刻浇一次水即可触发即熟
@@ -1146,14 +1164,16 @@ function app() {
       const cooldownMinLabel = Math.round(cdMs / 60000);
       // 0 浇水时：最快路径的最优行动是"立刻浇水"
       const waterNow = events.length === 0;
+      // 最快与懒人路径是否已收敛（1 秒容差只防浮点误差）
+      // windowA 已做冷却锁定检测，冷却 lock 时 windowA==windowB 自动触发
+      const fastConverged = !waterNow && Math.abs(windowA - windowB) < 1000;
       // 禁浇期起点（此时刻之后浇水会被冷却挡住即熟）
+      // 即使 fastConverged 也保留此警告：玩家在 fastForbidStart~windowA 之间浇水会把成熟时刻推后
       const fastForbidStart = predictedFastMat - cdMs;
       const lazyForbidStart = windowB - cdMs;
       // 用户是否已经在禁浇期内（过了起点还没到即熟时刻）
       const inFastForbid = !waterNow && now > fastForbidStart && now < predictedFastMat;
       const inLazyForbid = !waterNow && now > lazyForbidStart && now < windowB;
-      // 最快与懒人路径是否已收敛（1 秒容差只防浮点误差）
-      const fastConverged = !waterNow && Math.abs(windowA - windowB) < 1000;
       // Window A 已错过（T/3 deadline 已过，每多拖延一秒 predicted 推后 0.2 秒）
       const windowAMissed = !waterNow && windowA < now - 1000;
       // 立刻浇水场景：没浇过 OR 已浇过但过了 deadline。两种情况的最优动作都是立刻浇
