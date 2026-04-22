@@ -12,6 +12,7 @@ const HOUR_MS = 3600 * 1000;
 
 // ========== 核心算法（必须与 index.html 完全一致）==========
 
+// SYNC: 算法在前端 (index.html) 有副本，公式调整必须同步
 function computeMatTime(crop: any): number {
   const T = crop.type * HOUR_MS;
   const planted = new Date(crop.planted_at).getTime();
@@ -27,10 +28,13 @@ function computeMatTime(crop: any): number {
   return planted + T - reduction;
 }
 
+// SYNC: 算法在前端 (index.html) 有副本，公式调整必须同步
 function cooldownMs(crop: any): number {
   return crop.type * HOUR_MS / 30;
 }
 
+// SYNC: 算法在前端 (index.html) 有副本，公式调整必须同步
+// 分支 A 公式 (4·currentMat+lastEvent)/5 和 computePredictedFastMat 是同一个 τ_N，改时一起改
 function computeWindowB(crop: any): number {
   const T = crop.type * HOUR_MS;
   const planted = new Date(crop.planted_at).getTime();
@@ -50,6 +54,8 @@ function computeWindowB(crop: any): number {
   return rawB;
 }
 
+// SYNC: 算法在前端 (index.html) 有副本，公式调整必须同步
+// 注意内部内联了 computePredictedFastMat 的公式（避免循环引用），改 predicted 公式时要顺手改这里
 function computeWindowA(crop: any, now: number): number {
   const T = crop.type * HOUR_MS;
   const planted = new Date(crop.planted_at).getTime();
@@ -59,9 +65,18 @@ function computeWindowA(crop: any, now: number): number {
   const deadline = lastEvent + T / 3;
   const currentMat = computeMatTime(crop);
   const windowB = computeWindowB(crop);
+  // 冷却约束：与 index.html 同步（predicted - T/30 为倒数第二次浇水的最晚时刻）
+  const baseFormula = (4 * currentMat + lastEvent) / 5;
+  const waste = Math.max(0, now - lastEvent - T / 3);
+  const predicted = baseFormula + waste / 5;
+  if (windowB - predicted > 1000) {
+    return Math.min(deadline, currentMat, windowB, predicted - T / 30);
+  }
   return Math.min(deadline, currentMat, windowB);
 }
 
+// SYNC: 算法在前端 (index.html) 有副本，公式调整必须同步
+// 同时此公式 τ_N = (4·current_mat + lastEvent) / 5 也被 computeWindowA 内联使用，要一起改
 function computePredictedFastMat(crop: any, now: number): number {
   const T = crop.type * HOUR_MS;
   const planted = new Date(crop.planted_at).getTime();
@@ -114,7 +129,9 @@ function generateIcs(calName: string, events: IcsEvent[]): string {
     'X-PUBLISHED-TTL:PT1H',
   ];
   for (const e of events) {
-    const endMs = e.end ?? (e.start + 5 * 60 * 1000);
+    // 事件 duration 故意只放 1 分钟，日历视觉上只显示一条细线
+    // 避免用户误以为"5 分钟延后"的错觉；alarm 的 -5 min 仍是提前触发
+    const endMs = e.end ?? (e.start + 60 * 1000);
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:${e.uid}`);
     lines.push(`DTSTAMP:${formatIcsDate(Date.now())}`);
@@ -138,7 +155,8 @@ function generateIcs(calName: string, events: IcsEvent[]): string {
 // ========== 事件生成（按 path）==========
 
 function eventsForPath(crop: any, path: string): IcsEvent[] {
-  const cropLabel = `${crop.type}h 作物`;
+  const nameLabel = (crop.name || '').trim() || '作物';
+  const cropLabel = `${crop.type}h ${nameLabel}`;
   const now = Date.now();
   const cropIdShort = crop.id.slice(0, 8);
 
@@ -252,12 +270,13 @@ Deno.serve(async (req: Request) => {
       }
     }
     const content = generateIcs(`${userNickname}·${pathLabel}`, allEvents);
+    // Content-Disposition 的 filename 必须 ASCII，所以不用 nickname（可能带中文）
     return new Response(content, {
       status: 200,
       headers: {
         ...CORS_HEADERS,
         'Content-Type': 'text/calendar; charset=utf-8',
-        'Content-Disposition': `inline; filename="farm-${userNickname}-${path}.ics"`,
+        'Content-Disposition': `inline; filename="farm-user-${path}.ics"`,
         'Cache-Control': 'public, max-age=300',
       },
     });
@@ -278,8 +297,9 @@ Deno.serve(async (req: Request) => {
     });
   }
 
+  const nameLabel = (crop.name || '').trim() || '作物';
   if (crop.harvested_at) {
-    const content = generateIcs(`${crop.type}h 作物（已收获）`, []);
+    const content = generateIcs(`${crop.type}h ${nameLabel}（已收获）`, []);
     return new Response(content, {
       status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'text/calendar; charset=utf-8' },
@@ -287,7 +307,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const events = eventsForPath(crop, path);
-  const content = generateIcs(`${pathLabel}·${crop.type}h 作物`, events);
+  const content = generateIcs(`${pathLabel}·${crop.type}h ${nameLabel}`, events);
   return new Response(content, {
     status: 200,
     headers: {
