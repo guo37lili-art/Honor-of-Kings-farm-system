@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👥</text></svg>" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./common.js?v=6"></script>
+<script src="./common.js?v=7"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
   html, body { -webkit-tap-highlight-color: transparent; }
@@ -88,7 +88,7 @@
 
         <!-- 变异徽章 -->
         <div class="flex flex-wrap gap-1">
-          <template x-for="(m, idx) in (c.mutations || [])" :key="idx">
+          <template x-for="(m, idx) in sortedMutations(c.mutations)" :key="idx">
             <span class="text-[11px] px-2 py-0.5 rounded-full"
               :class="mutationBadgeClass(m)"
               x-text="mutationBadgeLabel(m)"></span>
@@ -335,6 +335,7 @@ function feedApp() {
     totalMultiplier(ms) { return totalMultiplier(ms); },
     mutationBadgeLabel(m) { return mutationBadgeLabel(m); },
     topMutationTextClass(ms) { return topMutationTextClass(ms); },
+    sortedMutations(ms) { return sortedMutations(ms); },
   };
 }
 </script>

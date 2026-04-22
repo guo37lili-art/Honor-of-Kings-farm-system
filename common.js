@@ -135,7 +135,7 @@ const MUTATION_TYPES = {
   purple: {
     label: '紫色',
     multiplier: 2.5,
-    subnames: ['青玉', '明珠', '璀璨', '琉璃'],
+    subnames: ['青玉', '明珠', '璀璨', '琉璃', '冰晶', '琥珀', '青铜', '铸铁'],
     textClass: 'text-purple-600 font-bold',
     badgeClass: 'bg-purple-50 border border-purple-400 text-purple-700',
   },
@@ -173,6 +173,14 @@ function topMutationTextClass(mutations) {
     }
   }
   return '';
+}
+
+// 按固定稀有度顺序（hero → giant → purple → normal）返回排序副本
+// 给纪念册 / 朋友圈卡片 badge 渲染用，保证左到右的顺序统一
+function sortedMutations(mutations) {
+  if (!mutations || mutations.length === 0) return [];
+  const order = { hero: 0, giant: 1, purple: 2, normal: 3 };
+  return [...mutations].sort((a, b) => (order[a.type] ?? 99) - (order[b.type] ?? 99));
 }
 
 // ========== 图片上传（Sprint 4）==========

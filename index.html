@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./common.js?v=6"></script>
+<script src="./common.js?v=7"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
   html, body { -webkit-tap-highlight-color: transparent; }
@@ -669,7 +669,7 @@
               </label>
               <template x-if="hasMutation('purple')">
                 <div class="pl-6 flex flex-wrap gap-3 mt-2">
-                  <template x-for="sub in ['青玉', '明珠', '璀璨', '琉璃']" :key="sub">
+                  <template x-for="sub in MUTATION_TYPES.purple.subnames" :key="sub">
                     <label class="flex items-center gap-1 cursor-pointer">
                       <input type="radio" name="purple-sub"
                         :value="sub"
