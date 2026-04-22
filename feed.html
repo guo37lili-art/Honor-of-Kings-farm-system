@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0ea5e9" />
+<title>朋友圈 · 王者农场助手</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👥</text></svg>" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./common.js?v=6"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  html, body { -webkit-tap-highlight-color: transparent; }
+  [x-cloak] { display: none !important; }
+</style>
+</head>
+<body class="bg-gradient-to-br from-sky-50 to-blue-100 min-h-screen text-slate-800">
+
+<div x-data="feedApp()" x-cloak class="max-w-2xl mx-auto p-4">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between gap-2 mb-4 pt-2 flex-wrap">
+    <div class="flex items-center gap-2">
+      <h1 class="text-xl font-bold text-sky-700 whitespace-nowrap inline-flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+        </svg>
+        <span>朋友圈</span>
+      </h1>
+      <template x-if="me">
+        <button @click="refresh()" :disabled="refreshing" title="刷新"
+          class="text-lg text-sky-600 hover:text-sky-700 disabled:opacity-50 leading-none"
+          :class="{'animate-spin': refreshing}">
+          🔄
+        </button>
+      </template>
+    </div>
+    <div class="text-sm flex items-center gap-3">
+      <a href="./index.html" class="text-emerald-600 hover:text-emerald-700">← 回主页</a>
+      <a href="./collection.html" class="text-amber-600 hover:text-amber-700">🏆 纪念册</a>
+      <template x-if="me">
+        <span class="text-slate-600"><b x-text="me.nickname"></b></span>
+      </template>
+    </div>
+  </header>
+
+  <!-- 未登录拦截 -->
+  <template x-if="!me">
+    <div class="bg-white rounded-xl shadow p-6 text-center space-y-3">
+      <div class="text-4xl">🔒</div>
+      <div>请先到<a href="./index.html" class="text-emerald-600 underline">主页</a>登录，才能看朋友圈</div>
+    </div>
+  </template>
+
+  <!-- 朋友圈列表（仅登录后展示）-->
+  <template x-if="me">
+  <div class="space-y-3">
+    <template x-for="c in feedItems" :key="c.id">
+      <div class="bg-white rounded-xl shadow p-4 space-y-2">
+        <!-- 头部：昵称·名字（一档） + 类型（次一档） + 相对时间 -->
+        <div class="flex items-center gap-2">
+          <span class="text-2xl" x-text="({8:'🌾', 16:'🌽', 32:'🫐'})[c.crop_type]"></span>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-sm truncate">
+              <a :href="'./collection.html#/u/' + encodeURIComponent(c.user_nickname)"
+                 class="hover:text-amber-600 hover:underline"
+                 x-text="c.user_nickname"></a>
+              <span class="text-slate-400 mx-1">·</span>
+              <span :class="topMutationTextClass(c.mutations)" x-text="c.crop_name || '作物'"></span>
+            </div>
+            <div class="text-xs text-slate-500" x-text="c.crop_type + 'h'"></div>
+          </div>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <span class="text-[11px] text-slate-400" x-text="timeAgo(c.created_at)"></span>
+            <template x-if="me && c.user_nickname === me.nickname">
+              <button @click="hideFromFeed(c)" title="从朋友圈隐藏（切回私密）"
+                class="text-slate-400 hover:text-red-500 leading-none">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <!-- 变异徽章 -->
+        <div class="flex flex-wrap gap-1">
+          <template x-for="(m, idx) in (c.mutations || [])" :key="idx">
+            <span class="text-[11px] px-2 py-0.5 rounded-full"
+              :class="mutationBadgeClass(m)"
+              x-text="mutationBadgeLabel(m)"></span>
+          </template>
+          <template x-if="!c.mutations || c.mutations.length === 0">
+            <span class="text-[11px] text-slate-400">无变异</span>
+          </template>
+        </div>
+
+        <!-- 备注 -->
+        <template x-if="c.note">
+          <div class="text-sm text-slate-600 italic break-words" x-text="'“' + c.note + '”'"></div>
+        </template>
+
+        <!-- 截图 -->
+        <template x-if="c.image_url">
+          <img :src="c.image_url" @click="lightboxUrl = c.image_url"
+            class="w-full max-h-64 object-cover rounded cursor-zoom-in hover:opacity-90 transition" />
+        </template>
+
+        <!-- 底部：点赞 + 问号 + 总倍数 -->
+        <div class="flex items-center justify-between text-[11px] pt-1 border-t">
+          <div class="inline-flex items-center gap-3">
+            <!-- 点赞：红心 -->
+            <button @click="toggleLike(c)"
+              :disabled="busyLikes.includes(c.id)"
+              :class="hasLiked(c) ? 'text-red-500' : 'text-slate-400 hover:text-red-400'"
+              class="inline-flex items-center gap-1 disabled:opacity-50 transition">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                :fill="hasLiked(c) ? 'currentColor' : 'none'"
+                class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              </svg>
+              <span x-text="likeCount(c)"></span>
+            </button>
+            <!-- 问号：琥珀色 -->
+            <button @click="toggleQuestion(c)"
+              :disabled="busyQuestions.includes(c.id)"
+              :class="hasQuestioned(c) ? 'text-amber-500' : 'text-slate-400 hover:text-amber-400'"
+              class="inline-flex items-center gap-1 disabled:opacity-50 transition">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                :fill="hasQuestioned(c) ? 'currentColor' : 'none'"
+                class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" :stroke="hasQuestioned(c) ? 'white' : 'currentColor'"
+                  d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+              </svg>
+              <span x-text="questionCount(c)"></span>
+            </button>
+          </div>
+          <span class="font-semibold text-amber-600" x-text="totalMultiplier(c.mutations) + '×'"></span>
+        </div>
+      </div>
+    </template>
+    <template x-if="feedItems.length === 0">
+      <div class="text-center text-slate-400 py-12 bg-white rounded-xl shadow">
+        <div class="text-4xl mb-2">🌱</div>
+        <div>朋友圈还空着</div>
+        <div class="text-xs mt-1">到<a href="./collection.html" class="text-amber-600 underline">纪念册</a>把某条切换为公开看看</div>
+      </div>
+    </template>
+  </div>
+  </template>
+
+  <!-- 图片 Lightbox：点缩略图进这个全屏 overlay，再点任意处关闭 -->
+  <template x-if="lightboxUrl">
+    <div class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-zoom-out"
+         @click="lightboxUrl = null">
+      <img :src="lightboxUrl" class="max-w-full max-h-full object-contain" />
+    </div>
+  </template>
+
+  <!-- Toast -->
+  <template x-if="toast">
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white rounded-full px-4 py-2 text-sm shadow-lg z-50"
+         x-text="toast"></div>
+  </template>
+
+</div>
+
+<script>
+// 相对时间 helper（暂时只朋友圈用）
+function timeAgo(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - new Date(ts).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return '刚刚';
+  if (s < 3600) return `${Math.floor(s/60)}min 前`;
+  if (s < 86400) return `${Math.floor(s/3600)}h 前`;
+  if (s < 2592000) return `${Math.floor(s/86400)}天前`;
+  return new Date(ts).toLocaleDateString('zh-CN', {month:'2-digit', day:'2-digit'});
+}
+
+function feedApp() {
+  return {
+    me: null,           // 必须登录才能看朋友圈
+    feedItems: [],
+    toast: '',
+    refreshing: false,
+    busyLikes: [],      // 正在处理点赞的 collection id，防快速连点
+    busyQuestions: [],  // 正在处理问号的 collection id，同上
+    lightboxUrl: null,  // 点截图放大用的 overlay
+
+    async init() {
+      if (!initSbClient()) {
+        alert('Supabase 库没加载成功，检查网络或 CDN 可达性');
+        return;
+      }
+      this.me = loadSavedMe();
+      // 未登录不拉数据，展示登录拦截
+      if (this.me) await this.loadFeed();
+    },
+
+    async loadFeed() {
+      // 关联查 likes + questions，前端算 count 和 has*
+      const { data, error } = await sbClient
+        .from('collections')
+        .select('*, collection_likes(user_nickname), collection_questions(user_nickname)')
+        .eq('is_public', true)
+        .order('created_at', { ascending: false });
+      if (!error) this.feedItems = data || [];
+    },
+
+    async refresh() {
+      if (this.refreshing || !this.me) return;
+      this.refreshing = true;
+      try {
+        await this.loadFeed();
+        this.showToast('✅ 已刷新');
+      } finally {
+        this.refreshing = false;
+      }
+    },
+
+    mutationBadgeClass(m) {
+      return MUTATION_TYPES[m.type]?.badgeClass || '';
+    },
+
+    // --- 自己的作物在朋友圈一键隐藏（改回私密）---
+    async hideFromFeed(c) {
+      if (!this.me || c.user_nickname !== this.me.nickname) return;
+      try {
+        const { data, error } = await sbClient.rpc('collection_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'update',
+          p_row_id: c.id,
+          p_payload: { is_public: false },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast('🔒 已从朋友圈隐藏');
+        await this.loadFeed();
+      } catch (e) {
+        alert('隐藏失败：' + (e.message || e));
+      }
+    },
+
+    // --- 点赞 ---
+    likeCount(c) {
+      return (c.collection_likes || []).length;
+    },
+    hasLiked(c) {
+      if (!this.me) return false;
+      return (c.collection_likes || []).some(l => l.user_nickname === this.me.nickname);
+    },
+    async toggleLike(c) {
+      if (!this.me || this.busyLikes.includes(c.id)) return;
+      this.busyLikes.push(c.id);
+      try {
+        const { data, error } = await sbClient.rpc('collection_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'like_toggle',
+          p_row_id: c.id,
+          p_payload: {},
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        // 重新拉一次 feed 以保证 count 权威准确
+        await this.loadFeed();
+      } catch (e) {
+        alert('点赞失败：' + (e.message || e));
+      } finally {
+        this.busyLikes = this.busyLikes.filter(id => id !== c.id);
+      }
+    },
+
+    // --- 问号（和点赞对称）---
+    questionCount(c) {
+      return (c.collection_questions || []).length;
+    },
+    hasQuestioned(c) {
+      if (!this.me) return false;
+      return (c.collection_questions || []).some(q => q.user_nickname === this.me.nickname);
+    },
+    async toggleQuestion(c) {
+      if (!this.me || this.busyQuestions.includes(c.id)) return;
+      this.busyQuestions.push(c.id);
+      try {
+        const { data, error } = await sbClient.rpc('collection_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'question_toggle',
+          p_row_id: c.id,
+          p_payload: {},
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        await this.loadFeed();
+      } catch (e) {
+        alert('问号失败：' + (e.message || e));
+      } finally {
+        this.busyQuestions = this.busyQuestions.filter(id => id !== c.id);
+      }
+    },
+
+    showToast(msg) {
+      this.toast = msg;
+      setTimeout(() => { this.toast = ''; }, 2000);
+    },
+
+    // pass-through for x-text
+    timeAgo(ts) { return timeAgo(ts); },
+    totalMultiplier(ms) { return totalMultiplier(ms); },
+    mutationBadgeLabel(m) { return mutationBadgeLabel(m); },
+    topMutationTextClass(ms) { return topMutationTextClass(ms); },
+  };
+}
+</script>
+</body>
+</html>

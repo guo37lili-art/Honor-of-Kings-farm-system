@@ -150,6 +150,8 @@ let sbClient = null;
 
 const HOUR_MS = 3600 * 1000;
 
+// SYNC-LITE: 这是 index.html computeMatTime 的"简化版"——少了 d 的 max(0,...) 和 reduction 的 min(_, T) 两处 clamp
+// 仅用于后台粗略展示成熟时间。如果某天后台需要精确显示，请同步对齐 index.html 的完整版
 function computeMatTime(crop) {
   const T = crop.type * HOUR_MS;
   const planted = new Date(crop.planted_at).getTime();

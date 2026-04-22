@@ -1,126 +1,176 @@
 # 王者农场助手 🌱
 
-为《王者荣耀》S43「小屋农场」玩法设计的种植/浇水/收获时间管理工具。基于土地干涸机制精确计算最优浇水时间表，支持 8/16/32h 作物、4 种玩法模式、多账号和好友只读分享。
+为《王者荣耀》S43「小屋农场」玩法设计的种植/浇水/收获时间管理工具。基于土地干涸机制精确计算最优浇水时间表。
 
-**单页 HTML + Supabase 后端 + GitHub Pages 托管，零运维，免费。**
+**架构**：单页 HTML（GitHub Pages）+ Supabase（数据库 + Edge Function）。零运维，免费额度内永久使用。
 
 ---
 
 ## 功能
 
-- ✅ 四种模式：Fast（4 次浇水，11T/15 成熟）、Lazy（2 次，5T/6）、Target（目标时间反推）、Nowater（0 次，卡点用）
-- ✅ 干涸度实时可视化，浇水目标 / 截止时间双提示
-- ✅ 末次浇水专属"浇水即熟"倒计时 UI
-- ✅ 多账号（昵称 + 4 位 PIN），好友只读链接分享
-- ✅ 手机浏览器可用，可加主屏当 app 用
+### 核心算法
+- 支持 8h / 16h / 32h 三种作物
+- 基于"土地干涸度随时间线性累积 + 每次浇水减少成熟时间"的真实机制
+- 首次浇水 d=1 奖励 · 每次浇水后冷却 T/30（8h→16min · 16h→32min · 32h→64min）
 
----
+### 三条路径展示
+每张作物卡同时展示三条策略路径的最优行动：
+- 🏃 **最快路径**：多次浇水，目标 11T/15 最短成熟
+- 💤 **懒人路径**：一次浇水即熟，目标 5T/6
+- 🌱 **自然生长**：不浇水，目标 T
 
-## 部署步骤（~15 min）
+每条路径显示：浇水时机（具体时刻）· 预计成熟 · 冷却禁浇期提醒
 
-### 1. 创建 Supabase 项目
+### 用户体验
+- **立刻浇水 🔥**：未浇过水 / 已过 T/3 截止 → 高亮提示立即动作
+- **浇水即熟判定**：实时模拟"此刻浇水"是否触发即熟，自动切红色卡片
+- **禁浇期警告**：最终浇水前 T/30 内浇水会破坏即熟，界面提前高亮警告
+- **路径收敛检测**：最快 == 懒人时合并显示"· 浇水即熟"标签，去掉"前"字
 
-1. 去 https://supabase.com/ 注册（免费）
-2. 新建项目（名字随意，数据库密码记好）
-3. 等项目启动（~2min）
-4. 点左侧 **SQL Editor** → New query → 粘贴 `schema.sql` 全文 → Run
-5. 点左侧 **Project Settings → API**，记下：
-   - Project URL（形如 `https://xxx.supabase.co`）
-   - anon / public key（`eyJ...` 开头的长串）
+### 作物管理
+- **新种作物**：种类 + 种植时间（"当前时间"一键填充）+ 是否立刻浇水 + 自定义名字
+- **已种导入**：游戏内成熟时间 + 水分剩余 → 反推内部状态，加入列表
+- **重命名**：卡片顶部 ✏️ 可随时改名（空=默认显示"作物"）
+- **自动清理**：已收获 30min 后自动删除，也可随时手动删
 
-### 2. 配置前端
+### 日历订阅
+- Supabase Edge Function 托管动态 .ics
+- iOS 走 `webcal://` 协议 → 原生"订阅日历"对话框，**一次订阅永久自动同步**
+- Android / 桌面走 HTTPS 链接
+- **用户级订阅**：`?user=昵称&path=fast` 聚合所有未收获作物
+- **单作物订阅**：`?crop_id=xxx&path=fast` 精细粒度
+- 浇水、收获后日历自动刷新（iOS 默认 15min-1h 一次）
 
-打开 `index.html`，找到顶部：
+### 多账号
+- 昵称 + 4 位 PIN 登录（服务端 bcrypt hash）
+- 作物数据公开可读，写操作校验 PIN
+- 朋友通过 `/#/u/<昵称>` URL 查看他人农场（只读）
 
-```js
-const SUPABASE_URL = 'https://YOUR_PROJECT.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY';
-```
-
-把两个值替换成上一步记下的。
-
-### 3. 发布到 GitHub Pages
-
-```bash
-# 在本目录
-git init
-git add index.html schema.sql README.md
-git commit -m "initial"
-git branch -M main
-
-# 到 GitHub 新建一个 repo（例如 wz-farm），按页面提示：
-git remote add origin https://github.com/<你的用户名>/wz-farm.git
-git push -u origin main
-```
-
-在 repo 的 **Settings → Pages**：
-- Source：Deploy from a branch
-- Branch：`main` / `/ (root)`
-- Save
-
-等 1-2 分钟，打开 `https://<你的用户名>.github.io/wz-farm/` 即可使用。
-
-### 4. 使用
-
-- 手机浏览器打开网址
-- 输入昵称 + 4 位数字 PIN（首次自动注册）
-- 点「+ 添加作物」开始种
-
-**朋友只读分享**：把 `https://<你的用户名>.github.io/wz-farm/#/u/<你的昵称>` 发给朋友，他们无需登录就能看你的农场。
-
-**添加到主屏**：iOS Safari 点分享 → 添加到主屏幕；Android Chrome 点右上菜单 → 添加到主屏幕。
-
----
-
-## 核心机制（给感兴趣的人）
-
-### 成熟时间公式
-
-- 每次浇水减少成熟时间 = `d × T/12`，其中 `d = min(1, 3·gap/T)` 为土地干涸度
-- 首次浇水 `d = 1` 恒定（土地默认干）
-- 正常 4 次浇水（Fast 模式）：时间表 `0, T/3, 2T/3, 11T/15`，成熟于 **11T/15**
-
-### 模式对照表
-
-| 模式 | 浇水次数 | 成熟时间 | 适用场景 |
-|---|---|---|---|
-| Fast | 4 | 11T/15（8h→5h52min）| 追求最优效率 |
-| Lazy | 2 | 5T/6（8h→6h40min）| 只想关心种 + 收两端 |
-| Target | 动态 | 用户指定 | 要卡特定收获点（如周五 18:00 双倍开闸）|
-| Nowater | 0 | T（8h→8h）| 懒到极致，或卡点不减 |
-
-### 末次浇水"浇水即熟"
-
-Fast 模式下第 4 次浇水必须**卡在预期成熟时刻**——浇下去作物立即成熟。工具在第 3 次浇水完成后自动切换到倒计时 UI，提示最后这一次必须精准。
-
----
-
-## 本地调试
-
-直接用浏览器打开 `index.html` 就能跑（需要先把 Supabase URL 和 key 填进去）。
-
-在浏览器 Console 跑：
-
-```js
-__farmTests()
-```
-
-会输出 6 个数学自测结果，全 ✅ 说明算法没问题。
+### 管理后台
+- `admin.html` 独立页面，需输入管理员昵称 + PIN
+- 聚合查看所有用户 + 所有作物
+- 按"活动中 / 待收获 / 已收获"筛选
 
 ---
 
 ## 技术栈
 
-- **前端**：单文件 `index.html`，Alpine.js + Tailwind（全 CDN，无构建）
-- **后端**：Supabase（Postgres + PostgREST + RPC），pgcrypto 做服务端 bcrypt
-- **托管**：GitHub Pages（静态）
-- **认证**：自建昵称 + 4 位 PIN，服务端 hash 比对
+| 层 | 技术 |
+|---|---|
+| 前端 | 单文件 `index.html`，Alpine.js v3 + TailwindCSS（CDN），无构建 |
+| 后端 | Supabase（Postgres + PostgREST + Edge Functions） |
+| 认证 | 自建昵称 + PIN，pgcrypto bcrypt hash |
+| 托管 | GitHub Pages（静态） |
 
-## 限制
+---
 
-- PIN 只有 4 位，建议不同昵称用不同 PIN，并保护你的 URL 链接
-- 数据未加端到端加密（朋友之间可见彼此作物，这是功能不是 bug）
-- 需要浏览器时间准确；离线时无法同步
+## 文件结构
+
+```
+/
+├── index.html                          前端主应用
+├── admin.html                          管理后台
+├── schema.sql                          Supabase 初始化 SQL
+├── supabase/
+│   └── functions/ics/index.ts          Edge Function（动态 .ics）
+├── README.md                           本文件
+└── TODO.md                             待优化项
+```
+
+---
+
+## 部署步骤
+
+### 1. Supabase 数据库
+
+1. 创建 Supabase 项目：https://supabase.com
+2. **SQL Editor** → New query → 粘贴 [`schema.sql`](schema.sql) 全文 → Run
+3. **Project Settings → API**：复制 Project URL 和 anon key
+
+### 2. 前端配置
+
+编辑 [`index.html`](index.html) 和 [`admin.html`](admin.html)，替换顶部两行：
+
+```js
+const SUPABASE_URL = 'https://<你的>.supabase.co';
+const SUPABASE_ANON_KEY = '<你的 anon key>';
+```
+
+`admin.html` 里另外改 `ADMIN_NICKNAME` 为你的昵称。
+
+### 3. Edge Function（日历订阅）
+
+- Dashboard → **Edge Functions** → **Create a new function**
+- 名字填 `ics`
+- 粘贴 [`supabase/functions/ics/index.ts`](supabase/functions/ics/index.ts) 全文
+- **关闭 "Verify JWT"**（日历 App 不带认证头）
+- Deploy
+
+### 4. GitHub Pages
+
+```bash
+cd /path/to/project
+git init
+git add .
+git commit -m "initial"
+git branch -M main
+git remote add origin https://github.com/<username>/<repo>.git
+git push -u origin main
+```
+
+Repo Settings → Pages → Source: main / root → Save。1-2 分钟后 `https://<username>.github.io/<repo>/` 生效。
+
+---
+
+## 数学模型
+
+### 成熟时间公式
+
+```
+每次浇水减少 = d × T/12
+d = min(1, 3·gap/T)   // 干涸度线性累积到 1 over T/3
+首次浇水恒 d=1          // 奖励 T/12
+冷却 = T/30             // 两次浇水间的最小间隔
+```
+
+### 三条路径的最优成熟
+
+| 路径 | 最优成熟 | 浇水次数 |
+|---|---|---|
+| 最快 | 11T/15 ≈ 0.733T | 4 次（平均每次 T/15 间隔） |
+| 懒人 | 5T/6 ≈ 0.833T | 2 次（plant + 5T/6） |
+| 自然 | T | 0 次 |
+
+### Window A（最快路径下次浇水截止）
+
+```
+Window A = min(lastEvent + T/3, currentMat, Window B)
+```
+
+### Window B（懒人即熟时刻）
+
+```
+分支 A (gap < T/3): B = (4·current_mat + lastEvent) / 5
+分支 B (gap ≥ T/3): B = max(lastEvent + T/3, current_mat - T/12)
+冷却约束：B ≥ lastEvent + T/30
+```
+
+### 最快路径预计成熟
+
+```
+predicted = (4·currentMat + lastEvent)/5 + waste/5
+waste = max(0, now - lastEvent - T/3)  // 超 T/3 的浪费时间
+```
+
+### Locked 状态
+
+```
+lockedByCooldown = (events.length > 0) && (cooldownEnd > currentMat)
+```
+
+此时冷却期长于剩余时间，用户无法再浇水，UI 显示单条"等自然成熟"提示。
+
+---
 
 ## License
 

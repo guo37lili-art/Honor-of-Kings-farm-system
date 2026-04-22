@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#f59e0b" />
+<title>我的纪念册 · 王者农场助手</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./common.js?v=6"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  html, body { -webkit-tap-highlight-color: transparent; }
+  [x-cloak] { display: none !important; }
+</style>
+</head>
+<body class="bg-gradient-to-br from-amber-50 to-yellow-100 min-h-screen text-slate-800">
+
+<div x-data="collectionApp()" x-cloak class="max-w-4xl mx-auto p-4">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between gap-2 mb-4 pt-2 flex-wrap">
+    <div class="flex items-center gap-2">
+      <h1 class="text-xl font-bold text-amber-700 whitespace-nowrap">
+        <template x-if="!viewingFriend"><span>🏆 我的纪念册</span></template>
+        <template x-if="viewingFriend"><span>🏆 <b x-text="viewingFriend"></b> 的纪念册</span></template>
+      </h1>
+      <template x-if="me && !viewingFriend">
+        <button @click="refresh()" :disabled="refreshing" title="刷新"
+          class="text-lg text-amber-600 hover:text-amber-700 disabled:opacity-50 leading-none"
+          :class="{'animate-spin': refreshing}">
+          🔄
+        </button>
+      </template>
+      <template x-if="viewingFriend">
+        <span class="text-xs text-slate-500">· 只看 TA 公开的</span>
+      </template>
+    </div>
+    <div class="text-sm flex items-center gap-3">
+      <template x-if="!viewingFriend">
+        <a href="./index.html" class="text-emerald-600 hover:text-emerald-700">← 回主页</a>
+      </template>
+      <template x-if="viewingFriend">
+        <a href="./feed.html" class="text-sky-600 hover:text-sky-700">← 朋友圈</a>
+      </template>
+      <template x-if="!viewingFriend">
+        <a href="./feed.html" class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+          </svg>
+          <span>朋友圈</span>
+        </a>
+      </template>
+      <template x-if="viewingFriend">
+        <a :href="'./index.html#/u/' + encodeURIComponent(viewingFriend)"
+           class="text-emerald-600 hover:text-emerald-700">看 TA 的农场 →</a>
+      </template>
+      <template x-if="me">
+        <span class="text-slate-600"><b x-text="me.nickname"></b></span>
+      </template>
+    </div>
+  </header>
+
+  <!-- 未登录且非朋友模式 -->
+  <template x-if="!me && !viewingFriend">
+    <div class="bg-white rounded-xl shadow p-6 text-center space-y-3">
+      <div class="text-4xl">🔒</div>
+      <div>请先到<a href="./index.html" class="text-emerald-600 underline">主工具</a>登录</div>
+    </div>
+  </template>
+
+  <!-- 主区：自己已登录 或 查看朋友的公开纪念册 -->
+  <template x-if="me || viewingFriend">
+    <div class="space-y-4">
+
+      <!-- 汇总 -->
+      <div class="bg-white rounded-xl shadow p-4 text-center">
+        <div class="text-3xl font-bold text-amber-600" x-text="collections.length"></div>
+        <div class="text-xs text-slate-500">
+          <template x-if="!viewingFriend"><span>总收藏数</span></template>
+          <template x-if="viewingFriend"><span>TA 公开的收藏数</span></template>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2">
+          🌈 英雄 <b x-text="countByType('hero')"></b> ·
+          🟡 巨大化 <b x-text="countByType('giant')"></b> ·
+          🟣 紫色 <b x-text="countByType('purple')"></b> ·
+          🔵 普通 <b x-text="countByType('normal')"></b>
+        </div>
+      </div>
+
+      <!-- 排序切换 + 手动录入 -->
+      <div class="flex items-center gap-2 text-sm flex-wrap">
+        <span class="text-slate-500">排序：</span>
+        <button @click="sortBy='multiplier'"
+          :class="sortBy==='multiplier' ? 'bg-amber-500 text-white' : 'bg-white text-slate-600 border border-slate-300'"
+          class="px-3 py-1 rounded-full shadow-sm">倍数 ↓</button>
+        <button @click="sortBy='time'"
+          :class="sortBy==='time' ? 'bg-amber-500 text-white' : 'bg-white text-slate-600 border border-slate-300'"
+          class="px-3 py-1 rounded-full shadow-sm">时间 ↓</button>
+        <template x-if="!viewingFriend">
+          <button @click="openManual()"
+            class="ml-auto px-3 py-1 rounded-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-700 shadow-sm">
+            + 手动录入
+          </button>
+        </template>
+      </div>
+
+      <!-- 卡片列表（单列，垂直排布）-->
+      <div class="space-y-3">
+        <template x-for="c in sortedCollections" :key="c.id">
+          <div class="bg-white rounded-xl shadow p-3 space-y-2">
+            <!-- 头部：左 = emoji + 名字✏️ + 类型 + 倍数；右 = 公开/私密切换 -->
+            <div class="flex items-start justify-between gap-2">
+              <div class="flex items-start gap-2 min-w-0">
+                <span class="text-2xl leading-none" x-text="({8:'🌾', 16:'🌽', 32:'🫐'})[c.crop_type]"></span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2">
+                    <div class="font-bold text-base truncate"
+                      :class="topMutationTextClass(c.mutations)"
+                      x-text="c.crop_name || '作物'"></div>
+                    <template x-if="!viewingFriend">
+                      <button @click="openEdit(c)" title="编辑"
+                        class="text-slate-400 hover:text-emerald-600 text-sm leading-none flex-shrink-0">✏️</button>
+                    </template>
+                  </div>
+                  <div class="text-xs text-slate-500" x-text="c.crop_type + 'h'"></div>
+                  <div class="text-sm font-bold mt-0.5"
+                    :class="topMutationTextClass(c.mutations) || 'text-slate-500'"
+                    x-text="totalMultiplier(c.mutations) + '×'"></div>
+                </div>
+              </div>
+              <template x-if="!viewingFriend">
+                <button @click="togglePublic(c)"
+                  :title="c.is_public ? '当前公开，点击切换为私密' : '当前私密，点击切换为公开'"
+                  class="inline-flex items-center gap-1 text-xs flex-shrink-0 leading-none"
+                  :class="c.is_public ? 'text-sky-500 hover:text-sky-600' : 'text-slate-500 hover:text-slate-600'">
+                  <template x-if="c.is_public">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
+                  </template>
+                  <template x-if="!c.is_public">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                    </svg>
+                  </template>
+                  <span x-text="c.is_public ? '公开' : '私密'"></span>
+                </button>
+              </template>
+            </div>
+
+            <!-- 变异徽章 -->
+            <div class="flex flex-wrap gap-1">
+              <template x-for="(m, idx) in (c.mutations || [])" :key="idx">
+                <span class="text-[11px] px-2 py-0.5 rounded-full"
+                  :class="mutationBadgeClass(m)"
+                  x-text="mutationBadgeLabel(m)"></span>
+              </template>
+              <template x-if="!c.mutations || c.mutations.length === 0">
+                <span class="text-[11px] text-slate-400">无变异</span>
+              </template>
+            </div>
+
+            <!-- 备注 -->
+            <template x-if="c.note">
+              <div class="text-xs text-slate-600 italic break-words" x-text="'“' + c.note + '”'"></div>
+            </template>
+
+            <!-- 截图 -->
+            <template x-if="c.image_url">
+              <img :src="c.image_url" @click="lightboxUrl = c.image_url"
+                class="w-full max-h-48 object-cover rounded cursor-zoom-in hover:opacity-90 transition" />
+            </template>
+
+            <!-- 底部：左 = 收获时间；右 = 红色删除按钮（朋友模式隐藏）-->
+            <div class="flex items-center justify-between text-[11px] pt-1 border-t">
+              <span class="text-slate-400">📅 <span x-text="formatDateTime(c.harvested_at)"></span></span>
+              <template x-if="!viewingFriend">
+                <button @click="confirmDelete(c)" title="从纪念册删除"
+                  class="text-red-400 hover:text-red-600 text-base leading-none p-1">
+                  🗑️
+                </button>
+              </template>
+            </div>
+          </div>
+        </template>
+        <template x-if="collections.length === 0 && !viewingFriend">
+          <div class="text-center text-slate-400 py-12 bg-white rounded-xl shadow">
+            <div class="text-4xl mb-2">🪴</div>
+            <div>还没有收藏</div>
+            <div class="text-xs mt-1">到<a href="./index.html" class="text-emerald-600 underline">主工具</a>收获一棵，或者点上面
+              <button @click="openManual()" class="text-emerald-600 underline">+ 手动录入</button>
+              补录以前的
+            </div>
+          </div>
+        </template>
+        <template x-if="collections.length === 0 && viewingFriend">
+          <div class="text-center text-slate-400 py-12 bg-white rounded-xl shadow">
+            <div class="text-4xl mb-2">🌱</div>
+            <div>TA 还没有公开任何收藏</div>
+          </div>
+        </template>
+      </div>
+
+    </div>
+  </template>
+
+  <!-- 编辑 Modal -->
+  <template x-if="editOpen">
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+         @click.self="editOpen=false">
+      <div class="bg-white rounded-xl p-5 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="font-semibold text-lg">
+          <template x-if="editMode === 'edit'"><span>✏️ 编辑纪念册</span></template>
+          <template x-if="editMode === 'manual'"><span>🏆 手动录入</span></template>
+        </h3>
+
+        <div>
+          <label class="text-sm text-slate-600">作物名</label>
+          <input type="text" x-model="editForm.crop_name" maxlength="20" placeholder="作物"
+            class="block w-full border rounded px-3 py-2 mt-1 box-border appearance-none text-base"
+            style="-webkit-appearance: none;" />
+        </div>
+
+        <!-- Edit 模式：类型+收获时间只读 -->
+        <template x-if="editMode === 'edit'">
+          <div class="text-xs text-slate-500">
+            收获于：<span x-text="formatDateTime(editForm.harvested_at)"></span>
+            · 类型：<span x-text="editForm.crop_type + 'h'"></span>
+          </div>
+        </template>
+
+        <!-- Manual 模式：可选类型 + 可填收获时间 -->
+        <template x-if="editMode === 'manual'">
+          <div class="space-y-3">
+            <div>
+              <label class="text-sm text-slate-600">作物类型</label>
+              <div class="grid grid-cols-3 gap-2 mt-1">
+                <template x-for="t in [8,16,32]" :key="t">
+                  <button type="button" @click="editForm.crop_type = t"
+                    :class="editForm.crop_type===t ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-700'"
+                    class="py-2 rounded font-semibold"
+                    x-text="t + 'h'"></button>
+                </template>
+              </div>
+            </div>
+            <div>
+              <label class="text-sm text-slate-600">收获时间</label>
+              <input type="datetime-local" x-model="editForm.harvested_at_local"
+                class="block w-full border rounded px-3 py-2 mt-1 box-border appearance-none text-base"
+                style="-webkit-appearance: none;" />
+            </div>
+          </div>
+        </template>
+
+        <div>
+          <div class="text-sm text-slate-600 mb-2">
+            变异（最多 3 种 · 已选 <span x-text="editForm.mutations.length"></span>/3）
+          </div>
+          <div class="space-y-2">
+            <label class="flex items-center gap-2 cursor-pointer p-2 border rounded hover:bg-slate-50"
+              :class="{'opacity-40 cursor-not-allowed': !hasMutation('hero') && editForm.mutations.length >= 3}">
+              <input type="checkbox"
+                :checked="hasMutation('hero')"
+                :disabled="!hasMutation('hero') && editForm.mutations.length >= 3"
+                @change="toggleMutation('hero')" />
+              <span class="bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">🌈 英雄</span>
+              <span class="text-xs text-slate-500">28×</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer p-2 border rounded hover:bg-slate-50"
+              :class="{'opacity-40 cursor-not-allowed': !hasMutation('giant') && editForm.mutations.length >= 3}">
+              <input type="checkbox"
+                :checked="hasMutation('giant')"
+                :disabled="!hasMutation('giant') && editForm.mutations.length >= 3"
+                @change="toggleMutation('giant')" />
+              <span class="text-amber-500 font-bold">🟡 巨大化</span>
+              <span class="text-xs text-slate-500">8×</span>
+            </label>
+            <div class="border rounded p-2"
+              :class="{'opacity-40': !hasMutation('purple') && editForm.mutations.length >= 3}">
+              <label class="flex items-center gap-2 cursor-pointer"
+                :class="{'cursor-not-allowed': !hasMutation('purple') && editForm.mutations.length >= 3}">
+                <input type="checkbox"
+                  :checked="hasMutation('purple')"
+                  :disabled="!hasMutation('purple') && editForm.mutations.length >= 3"
+                  @change="togglePurple()" />
+                <span class="text-purple-600 font-bold">🟣 紫色</span>
+                <span class="text-xs text-slate-500">2.5×</span>
+              </label>
+              <template x-if="hasMutation('purple')">
+                <div class="pl-6 flex flex-wrap gap-3 mt-2">
+                  <template x-for="sub in ['青玉', '明珠', '璀璨', '琉璃']" :key="sub">
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="radio" name="purple-sub"
+                        :value="sub" :checked="purpleSubname() === sub"
+                        @change="setPurpleSubname(sub)" />
+                      <span class="text-sm text-purple-700" x-text="sub"></span>
+                    </label>
+                  </template>
+                </div>
+              </template>
+            </div>
+            <label class="flex items-center gap-2 cursor-pointer p-2 border rounded hover:bg-slate-50"
+              :class="{'opacity-40 cursor-not-allowed': !hasMutation('normal') && editForm.mutations.length >= 3}">
+              <input type="checkbox"
+                :checked="hasMutation('normal')"
+                :disabled="!hasMutation('normal') && editForm.mutations.length >= 3"
+                @change="toggleMutation('normal')" />
+              <span class="text-blue-500 font-bold">🔵 普通</span>
+              <span class="text-xs text-slate-500">1.5×</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-sm text-slate-600">备注（可选）</label>
+          <textarea x-model="editForm.note" maxlength="100" rows="2"
+            class="block w-full border rounded px-3 py-2 mt-1 text-sm box-border appearance-none"
+            style="-webkit-appearance: none;"></textarea>
+        </div>
+
+        <!-- 截图（可选） -->
+        <div>
+          <label class="text-sm text-slate-600">截图（可选，≤50MB）</label>
+          <div class="mt-1">
+            <template x-if="!editImageFile && !editForm.image_url">
+              <label class="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 rounded cursor-pointer hover:bg-slate-50 text-sm">
+                📷 选图
+                <input type="file" accept="image/*" class="hidden" @change="onEditImageSelect($event)" />
+              </label>
+            </template>
+            <template x-if="editImageFile || editForm.image_url">
+              <div class="relative inline-block">
+                <img :src="editImagePreview()" class="w-24 h-24 object-cover rounded border" />
+                <button @click="clearEditImage()" type="button"
+                  class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs leading-none flex items-center justify-center">×</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 公开到朋友圈 -->
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" x-model="editForm.is_public" class="w-4 h-4" />
+          <span>👥 公开到朋友圈（其他玩家能在朋友圈看到）</span>
+        </label>
+
+        <div class="flex gap-2 pt-2">
+          <button @click="editOpen=false" class="flex-1 border border-slate-300 rounded py-2">取消</button>
+          <button @click="saveEdit()" :disabled="editLoading"
+            class="flex-1 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded py-2 font-semibold">
+            <span x-text="editLoading ? '保存中...' : (editMode === 'manual' ? '🏆 录入' : '保存')"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 删除确认 -->
+  <template x-if="deleteTarget">
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+         @click.self="deleteTarget=null">
+      <div class="bg-white rounded-xl p-5 w-full max-w-sm space-y-4">
+        <h3 class="font-semibold">确认删除？</h3>
+        <p class="text-sm text-slate-600">
+          <b x-text="(deleteTarget.crop_name || '作物') + '（' + deleteTarget.crop_type + 'h）'"></b>
+          将永久从纪念册移除，不可恢复。
+        </p>
+        <div class="flex gap-2">
+          <button @click="deleteTarget=null" class="flex-1 border border-slate-300 rounded py-2">取消</button>
+          <button @click="deleteCollection(deleteTarget)"
+            class="flex-1 bg-red-500 hover:bg-red-600 text-white rounded py-2 font-semibold">删除</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- 图片 Lightbox：点缩略图进这个全屏 overlay，再点任意处关闭 -->
+  <template x-if="lightboxUrl">
+    <div class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-zoom-out"
+         @click="lightboxUrl = null">
+      <img :src="lightboxUrl" class="max-w-full max-h-full object-contain" />
+    </div>
+  </template>
+
+  <!-- Toast -->
+  <template x-if="toast">
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white rounded-full px-4 py-2 text-sm shadow-lg z-50"
+         x-text="toast"></div>
+  </template>
+
+</div>
+
+<script>
+function collectionApp() {
+  return {
+    me: null,
+    viewingFriend: null,    // 通过 hash #/u/xxx 进入朋友的公开纪念册，只读
+    collections: [],
+    sortBy: 'multiplier',   // 'multiplier' | 'time'
+    editOpen: false,
+    editForm: {
+      id: null,
+      crop_type: 8,
+      crop_name: '',
+      harvested_at: null,
+      harvested_at_local: '',  // manual 模式 <input type="datetime-local"> 的绑定值
+      mutations: [],
+      note: '',
+      is_public: false,
+      image_url: null,
+    },
+    editMode: 'edit',       // 'edit' = 编辑已有条目；'manual' = 手动录入新条目
+    editImageFile: null,    // 选图但未保存的本地 File
+    editLoading: false,
+    deleteTarget: null,
+    toast: '',
+    refreshing: false,
+    lightboxUrl: null,      // 点图片放大用的 overlay 状态
+
+    async init() {
+      if (!initSbClient()) {
+        alert('Supabase 库没加载成功，检查网络或 CDN 可达性');
+        return;
+      }
+      this.me = loadSavedMe();
+      this.parseHash();
+      window.addEventListener('hashchange', () => this.parseHash());
+    },
+
+    // 解析 URL：#/u/朋友昵称 → 进入朋友只读模式；否则自己模式
+    parseHash() {
+      const h = location.hash || '#/';
+      const m = h.match(/^#\/u\/([^/]+)/);
+      this.viewingFriend = m ? decodeURIComponent(m[1]) : null;
+      this.loadCollections();
+    },
+
+    async loadCollections() {
+      if (this.viewingFriend) {
+        // 朋友模式：只看朋友公开的那些
+        const { data, error } = await sbClient
+          .from('collections')
+          .select('*')
+          .eq('user_nickname', this.viewingFriend)
+          .eq('is_public', true)
+          .order('created_at', { ascending: false });
+        if (!error) this.collections = data || [];
+        return;
+      }
+      // 自己模式
+      if (!this.me) { this.collections = []; return; }
+      const { data, error } = await sbClient
+        .from('collections')
+        .select('*')
+        .eq('user_nickname', this.me.nickname)
+        .order('created_at', { ascending: false });
+      if (!error) this.collections = data || [];
+    },
+
+    // 手动刷新：重新拉收藏列表并给玩家显式反馈
+    async refresh() {
+      if (this.refreshing || !this.me) return;
+      this.refreshing = true;
+      try {
+        await this.loadCollections();
+        this.showToast('✅ 已刷新');
+      } finally {
+        this.refreshing = false;
+      }
+    },
+
+    get sortedCollections() {
+      const copy = [...this.collections];
+      if (this.sortBy === 'multiplier') {
+        return copy.sort((a, b) => totalMultiplier(b.mutations) - totalMultiplier(a.mutations));
+      }
+      return copy.sort((a, b) =>
+        new Date(b.harvested_at || b.created_at) - new Date(a.harvested_at || a.created_at));
+    },
+
+    countByType(type) {
+      return this.collections.filter(c =>
+        (c.mutations || []).some(m => m.type === type)).length;
+    },
+
+    mutationBadgeClass(m) {
+      return MUTATION_TYPES[m.type]?.badgeClass || '';
+    },
+
+    // --- 编辑（朋友模式下禁用）---
+    openEdit(c) {
+      if (this.viewingFriend) return;
+      this.editForm = {
+        id: c.id,
+        crop_type: c.crop_type,
+        crop_name: c.crop_name || '',
+        harvested_at: c.harvested_at,
+        harvested_at_local: '',  // edit 模式不用这个
+        // 深拷贝避免改 modal 时污染原列表
+        mutations: JSON.parse(JSON.stringify(c.mutations || [])),
+        note: c.note || '',
+        is_public: !!c.is_public,
+        image_url: c.image_url || null,
+      };
+      this.editMode = 'edit';
+      this.editImageFile = null;
+      this.originalImageUrl = c.image_url || null;  // 记住进 modal 时的原图 URL，保存后用来清理被替换的旧图
+      this.editOpen = true;
+    },
+
+    // 手动录入：以前游戏里出的变异作物（没走过本工具）想补录进纪念册
+    openManual() {
+      if (this.viewingFriend || !this.me) return;
+      const now = new Date();
+      this.editForm = {
+        id: null,
+        crop_type: 8,
+        crop_name: '',
+        harvested_at: now.toISOString(),
+        harvested_at_local: toLocalIsoForInput(now),
+        mutations: [],
+        note: '',
+        is_public: false,
+        image_url: null,
+      };
+      this.editMode = 'manual';
+      this.editImageFile = null;
+      this.originalImageUrl = null;
+      this.editOpen = true;
+    },
+
+    // --- 编辑 modal 的截图处理（和 index.html 的 collect modal 对称）---
+    onEditImageSelect(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (!file.type || !file.type.startsWith('image/')) {
+        alert('只能选图片');
+        event.target.value = '';
+        return;
+      }
+      this.editImageFile = file;
+    },
+    editImagePreview() {
+      if (this.editImageFile) return URL.createObjectURL(this.editImageFile);
+      return this.editForm.image_url || '';
+    },
+    clearEditImage() {
+      this.editImageFile = null;
+      this.editForm.image_url = null;
+    },
+
+    hasMutation(type) {
+      return this.editForm.mutations.some(m => m.type === type);
+    },
+    toggleMutation(type) {
+      const idx = this.editForm.mutations.findIndex(m => m.type === type);
+      if (idx >= 0) {
+        this.editForm.mutations.splice(idx, 1);
+      } else {
+        if (this.editForm.mutations.length >= 3) return;
+        this.editForm.mutations.push({ type });
+      }
+    },
+    togglePurple() {
+      if (this.hasMutation('purple')) {
+        this.editForm.mutations = this.editForm.mutations.filter(m => m.type !== 'purple');
+      } else {
+        if (this.editForm.mutations.length >= 3) return;
+        this.editForm.mutations.push({ type: 'purple', name: '青玉' });
+      }
+    },
+    purpleSubname() {
+      const p = this.editForm.mutations.find(m => m.type === 'purple');
+      return p ? p.name : null;
+    },
+    setPurpleSubname(sub) {
+      const p = this.editForm.mutations.find(m => m.type === 'purple');
+      if (p) p.name = sub;
+    },
+
+    async saveEdit() {
+      if (this.viewingFriend) return;
+      this.editLoading = true;
+      try {
+        // 若选了新截图，先上传拿 URL
+        if (this.editImageFile) {
+          try {
+            this.editForm.image_url = await uploadImage(this.editImageFile, this.me.nickname);
+            this.editImageFile = null;
+          } catch (e) {
+            alert('截图上传失败（仅截图失败，其他修改照常保存）：' + (e.message || e));
+            this.editImageFile = null;
+          }
+        }
+        // manual 模式：从 local datetime 输入反推 ISO；否则用 editForm.harvested_at（edit 模式保留原值）
+        const harvestedAtIso = (this.editMode === 'manual' && this.editForm.harvested_at_local)
+          ? new Date(this.editForm.harvested_at_local).toISOString()
+          : this.editForm.harvested_at;
+
+        const payload = {
+          crop_name: (this.editForm.crop_name || '').trim(),
+          mutations: this.editForm.mutations,
+          note: (this.editForm.note || '').trim(),
+          is_public: this.editForm.is_public,
+          image_url: this.editForm.image_url || '',
+        };
+
+        let rpcAction, rpcRowId;
+        if (this.editMode === 'manual') {
+          // 手动录入：走 insert，需要带上 crop_type 和 harvested_at
+          rpcAction = 'insert';
+          rpcRowId = null;
+          payload.crop_type = this.editForm.crop_type;
+          payload.harvested_at = harvestedAtIso;
+        } else {
+          // 编辑既有：走 update
+          rpcAction = 'update';
+          rpcRowId = this.editForm.id;
+        }
+
+        const { data, error } = await sbClient.rpc('collection_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: rpcAction,
+          p_row_id: rpcRowId,
+          p_payload: payload,
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        // DB 更新成功后，若图换了（或清了），原图变孤儿，顺手从 Storage 清理
+        if (this.originalImageUrl && this.originalImageUrl !== (this.editForm.image_url || null)) {
+          await removeImageByUrl(this.originalImageUrl);
+        }
+        this.editOpen = false;
+        this.showToast(this.editMode === 'manual' ? '🏆 已录入纪念册' : '已保存');
+        await this.loadCollections();
+      } catch (e) {
+        alert('保存失败：' + (e.message || e));
+      } finally {
+        this.editLoading = false;
+      }
+    },
+
+    // --- 一键切换公开/私密（朋友模式禁用）---
+    async togglePublic(c) {
+      if (this.viewingFriend) return;
+      try {
+        const { data, error } = await sbClient.rpc('collection_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'update',
+          p_row_id: c.id,
+          p_payload: { is_public: !c.is_public },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast(c.is_public ? '🔒 改为私密' : '👥 已公开到朋友圈');
+        await this.loadCollections();
+      } catch (e) {
+        alert('切换失败：' + (e.message || e));
+      }
+    },
+
+    // --- 删除（朋友模式禁用）---
+    confirmDelete(c) {
+      if (this.viewingFriend) return;
+      this.deleteTarget = c;
+    },
+    async deleteCollection(c) {
+      if (this.viewingFriend) return;
+      try {
+        const { data, error } = await sbClient.rpc('collection_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'delete',
+          p_row_id: c.id,
+          p_payload: {},
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        // DB 删除成功后，顺手清理 Storage 里的图（失败静默忽略）
+        if (c.image_url) {
+          await removeImageByUrl(c.image_url);
+        }
+        this.deleteTarget = null;
+        this.showToast('已删除');
+        await this.loadCollections();
+      } catch (e) {
+        alert('删除失败：' + (e.message || e));
+      }
+    },
+
+    showToast(msg) {
+      this.toast = msg;
+      setTimeout(() => { this.toast = ''; }, 2000);
+    },
+
+    // pass-through for x-text（模板里能直接调）
+    formatDateTime(ts) { return formatDateTime(ts); },
+    totalMultiplier(ms) { return totalMultiplier(ms); },
+    mutationBadgeLabel(m) { return mutationBadgeLabel(m); },
+    topMutationTextClass(ms) { return topMutationTextClass(ms); },
+  };
+}
+</script>
+</body>
+</html>

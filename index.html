@@ -8,6 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./common.js?v=6"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
   html, body { -webkit-tap-highlight-color: transparent; }
@@ -35,7 +36,16 @@
     </div>
     <div class="text-sm">
       <template x-if="me">
-        <div class="flex items-center gap-2 whitespace-nowrap">
+        <div class="flex items-center gap-3 whitespace-nowrap">
+          <template x-if="!viewingFriend">
+            <button @click="copyFarmLink()" title="复制我的农场链接发给朋友"
+              class="inline-flex items-center gap-1 text-sky-600 hover:text-sky-700">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3l-3-3m0 0l-3 3m3-3V15" />
+              </svg>
+              <span>分享</span>
+            </button>
+          </template>
           <span class="text-slate-600">
             <template x-if="viewingFriend"><span>👀 <b x-text="viewingFriend"></b></span></template>
             <template x-if="!viewingFriend"><span><b x-text="me.nickname"></b></span></template>
@@ -132,10 +142,20 @@
               📅 订阅全部懒人提醒
             </button>
           </div>
-          <button @click="copyFarmLink()"
-            class="w-full bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg py-2 text-sky-700 text-xs">
-            🔗 复制我的农场链接 · 发给朋友看
-          </button>
+          <div class="grid grid-cols-2 gap-2">
+            <a href="./collection.html"
+              class="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white rounded-xl py-3 text-center font-semibold shadow-md hover:shadow-lg transition">
+              <span class="text-lg">🏆</span>
+              <span>我的纪念册</span>
+            </a>
+            <a href="./feed.html"
+              class="flex items-center justify-center gap-2 bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-500 hover:from-sky-500 hover:to-indigo-600 text-white rounded-xl py-3 text-center font-semibold shadow-md hover:shadow-lg transition">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+              </svg>
+              <span>朋友圈</span>
+            </a>
+          </div>
         </div>
       </template>
 
@@ -183,6 +203,18 @@
                     class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded py-2 text-sm font-semibold">
                     ↻ 再种一棵（同类型 · 沿用"立刻浇水"设定）
                   </button>
+                </template>
+                <template x-if="!viewingFriend && !collectedCropIds.includes(crop.id)">
+                  <button @click="openCollect(crop)"
+                    class="w-full bg-amber-500 hover:bg-amber-600 text-white rounded py-2 text-sm font-semibold">
+                    🏆 收入纪念册
+                  </button>
+                </template>
+                <template x-if="!viewingFriend && collectedCropIds.includes(crop.id)">
+                  <a href="./collection.html"
+                    class="block w-full bg-slate-100 border border-slate-300 rounded py-2 text-sm text-slate-500 text-center hover:bg-slate-200">
+                    ✓ 已收入纪念册 · 点此查看
+                  </a>
                 </template>
                 <div class="text-center text-[11px] text-slate-400">
                   30 分钟后自动清理 · 或立即
@@ -574,6 +606,141 @@
     </div>
   </template>
 
+  <!-- ============== Collect Modal（收入纪念册） ============== -->
+  <template x-if="collectOpen">
+    <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+         @click.self="collectOpen=false">
+      <div class="bg-white rounded-xl p-5 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
+        <h3 class="font-semibold text-lg">🏆 收入纪念册</h3>
+
+        <!-- 作物名（可改） -->
+        <div>
+          <label class="text-sm text-slate-600">作物名</label>
+          <input type="text" x-model="collectForm.crop_name" maxlength="20" placeholder="作物"
+            class="block w-full border rounded px-3 py-2 mt-1 box-border appearance-none text-base"
+            style="-webkit-appearance: none;" />
+        </div>
+
+        <!-- 收获时间（只读） -->
+        <div class="text-xs text-slate-500">
+          收获于：<span x-text="formatDateTime(collectForm.harvested_at)"></span>
+          · 类型：<span x-text="collectForm.crop_type + 'h'"></span>
+        </div>
+
+        <!-- 变异选择 -->
+        <div>
+          <div class="text-sm text-slate-600 mb-2">
+            变异（最多 3 种，同类型只能选 1 · 当前已选 <span x-text="collectForm.mutations.length"></span>/3）
+          </div>
+          <div class="space-y-2">
+            <!-- 英雄 -->
+            <label class="flex items-center gap-2 cursor-pointer p-2 border rounded hover:bg-slate-50"
+              :class="{'opacity-40 cursor-not-allowed': !hasMutation('hero') && collectForm.mutations.length >= 3}">
+              <input type="checkbox"
+                :checked="hasMutation('hero')"
+                :disabled="!hasMutation('hero') && collectForm.mutations.length >= 3"
+                @change="toggleMutation('hero')" />
+              <span class="bg-gradient-to-r from-red-500 via-yellow-500 via-green-500 via-blue-500 to-purple-500 bg-clip-text text-transparent font-bold">🌈 英雄</span>
+              <span class="text-xs text-slate-500">28×</span>
+            </label>
+
+            <!-- 巨大化 -->
+            <label class="flex items-center gap-2 cursor-pointer p-2 border rounded hover:bg-slate-50"
+              :class="{'opacity-40 cursor-not-allowed': !hasMutation('giant') && collectForm.mutations.length >= 3}">
+              <input type="checkbox"
+                :checked="hasMutation('giant')"
+                :disabled="!hasMutation('giant') && collectForm.mutations.length >= 3"
+                @change="toggleMutation('giant')" />
+              <span class="text-amber-500 font-bold">🟡 巨大化</span>
+              <span class="text-xs text-slate-500">8×</span>
+            </label>
+
+            <!-- 紫色（含子选项） -->
+            <div class="border rounded p-2"
+              :class="{'opacity-40': !hasMutation('purple') && collectForm.mutations.length >= 3}">
+              <label class="flex items-center gap-2 cursor-pointer"
+                :class="{'cursor-not-allowed': !hasMutation('purple') && collectForm.mutations.length >= 3}">
+                <input type="checkbox"
+                  :checked="hasMutation('purple')"
+                  :disabled="!hasMutation('purple') && collectForm.mutations.length >= 3"
+                  @change="togglePurple()" />
+                <span class="text-purple-600 font-bold">🟣 紫色</span>
+                <span class="text-xs text-slate-500">2.5×</span>
+              </label>
+              <template x-if="hasMutation('purple')">
+                <div class="pl-6 flex flex-wrap gap-3 mt-2">
+                  <template x-for="sub in ['青玉', '明珠', '璀璨', '琉璃']" :key="sub">
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="radio" name="purple-sub"
+                        :value="sub"
+                        :checked="purpleSubname() === sub"
+                        @change="setPurpleSubname(sub)" />
+                      <span class="text-sm text-purple-700" x-text="sub"></span>
+                    </label>
+                  </template>
+                </div>
+              </template>
+            </div>
+
+            <!-- 普通 -->
+            <label class="flex items-center gap-2 cursor-pointer p-2 border rounded hover:bg-slate-50"
+              :class="{'opacity-40 cursor-not-allowed': !hasMutation('normal') && collectForm.mutations.length >= 3}">
+              <input type="checkbox"
+                :checked="hasMutation('normal')"
+                :disabled="!hasMutation('normal') && collectForm.mutations.length >= 3"
+                @change="toggleMutation('normal')" />
+              <span class="text-blue-500 font-bold">🔵 普通</span>
+              <span class="text-xs text-slate-500">1.5×</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 备注 -->
+        <div>
+          <label class="text-sm text-slate-600">备注（可选）</label>
+          <textarea x-model="collectForm.note" maxlength="100" rows="2" placeholder="留点文字给未来的自己"
+            class="block w-full border rounded px-3 py-2 mt-1 text-sm box-border appearance-none"
+            style="-webkit-appearance: none;"></textarea>
+        </div>
+
+        <!-- 截图（可选） -->
+        <div>
+          <label class="text-sm text-slate-600">截图（可选，≤50MB）</label>
+          <div class="mt-1">
+            <template x-if="!collectImageFile && !collectForm.image_url">
+              <label class="inline-flex items-center gap-2 px-3 py-2 border border-slate-300 rounded cursor-pointer hover:bg-slate-50 text-sm">
+                📷 选图
+                <input type="file" accept="image/*" class="hidden" @change="onCollectImageSelect($event)" />
+              </label>
+            </template>
+            <template x-if="collectImageFile || collectForm.image_url">
+              <div class="relative inline-block">
+                <img :src="collectImagePreview()" class="w-24 h-24 object-cover rounded border" />
+                <button @click="clearCollectImage()" type="button"
+                  class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 hover:bg-red-600 text-white rounded-full text-xs leading-none flex items-center justify-center">×</button>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- 公开到朋友圈 -->
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" x-model="collectForm.is_public" class="w-4 h-4" />
+          <span>👥 公开到朋友圈（其他玩家能在朋友圈看到）</span>
+        </label>
+
+        <div class="flex gap-2 pt-2">
+          <button @click="collectOpen=false"
+            class="flex-1 border border-slate-300 rounded py-2">取消</button>
+          <button @click="saveCollect()" :disabled="collectLoading"
+            class="flex-1 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded py-2 font-semibold">
+            <span x-text="collectLoading ? '保存中...' : '🏆 收入'"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </template>
+
   <!-- ============== Delete Confirm Modal ============== -->
   <template x-if="deleteTarget">
     <div class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
@@ -604,22 +771,12 @@
 <!-- ============== App JS ============== -->
 <script>
 
-// ========== CONFIG ==========
-// Supabase 项目配置
-const SUPABASE_URL = 'https://eebimxoefmibbxxtmebp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlYmlteG9lZm1pYmJ4eHRtZWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NDIzNzQsImV4cCI6MjA5MjIxODM3NH0.zfHwvQ_o17Q10ZovGdWy9uNzhL_FsD463rUnDpNN180';
-
-// 好友圈（硬编码）：圈内人互相推送"浇水即熟 / 1h 内即将即熟"的作物提醒
-// 未来扩展方案：换成从 localStorage 或 users 表读，代码结构不变
-const FRIEND_LIST = ['长缨', '华山一棵松', 'lc'];
-
-// 模块级 Supabase 客户端 —— 不放进 Alpine 响应式 state，避免 Proxy 包装破坏内部私有字段
-let sbClient = null;
+// CONFIG 和 HOUR_MS / sbClient / FRIEND_LIST 已移到 common.js（通过 head 里的 <script src> 引入）
 
 // ========== 核心时间算法 ==========
 
-const HOUR_MS = 3600 * 1000;
-
+// SYNC: 算法在 Edge Function (supabase/functions/ics/index.ts) 有副本，公式调整必须同步
+// 也在 admin.html 有"简化版"（少两处 clamp，仅供后台粗略展示），改动时考虑是否一并对齐
 function computeMatTime(crop) {
   const T = crop.type * HOUR_MS;
   const planted = new Date(crop.planted_at).getTime();
@@ -662,6 +819,7 @@ function previewWaterEffect(crop, now) {
   };
 }
 
+// SYNC: 算法在 Edge Function (supabase/functions/ics/index.ts) 有副本，公式调整必须同步
 // 游戏规则：任意两次浇水之间的冷却时间 = T/30
 // 8h → 16min · 16h → 32min · 32h → 64min
 function cooldownMs(crop) {
@@ -675,6 +833,8 @@ function cooldownEndAt(crop) {
   return waters[waters.length - 1] + cooldownMs(crop);
 }
 
+// SYNC: 算法在 Edge Function (supabase/functions/ics/index.ts) 有副本，公式调整必须同步
+// 注意内部内联了 computePredictedFastMat 的公式（避免循环引用），改 predicted 公式时要顺手改这里
 // Window A：最快路径下次浇水的截止时刻
 // - 0 次浇水：返回 now（应该立刻浇水，每延迟 1 秒预计成熟就推后 0.2 秒）
 // - 否则：lastEvent + T/3（过此满干涸浪费）
@@ -708,6 +868,8 @@ function computeWindowA(crop, now) {
   return Math.min(deadline, currentMat, windowB);
 }
 
+// SYNC: 算法在 Edge Function (supabase/functions/ics/index.ts) 有副本，公式调整必须同步
+// 同时此公式 τ_N = (4·current_mat + lastEvent) / 5 也被 computeWindowA 内联使用，要一起改
 // 最快路径预计成熟时间：从当前状态严格按 Window A 节奏浇水的最终成熟时刻
 // 公式核心：τ_N = (4·current_mat + lastEvent) / 5
 // 修正项 1：0 次浇水 → 虚拟 "此刻浇首次水" 以包含 T/12 奖励
@@ -736,6 +898,8 @@ function computePredictedFastMat(crop, now) {
   return Math.max(nowMs, Math.min(predicted, currentMat));
 }
 
+// SYNC: 算法在 Edge Function (supabase/functions/ics/index.ts) 有副本，公式调整必须同步
+// 分支 A 公式 (4·currentMat+lastEvent)/5 和 computePredictedFastMat 是同一个 τ_N，改时一起改
 // Window B：懒人路径——在此时刻浇一次水即可触发即熟
 // 若 gap < T/3 分支有解：B = (4·current_mat + lastEvent) / 5
 // 否则：B = max(lastEvent + T/3, current_mat − T/12)
@@ -776,73 +940,9 @@ function computeDryness(crop, now) {
   return Math.max(0, (now - last) / (T / 3));
 }
 
-// ========== Helpers ==========
-
-function formatDateTime(ts) {
-  if (!ts) return '--';
-  const d = new Date(ts);
-  const now = new Date();
-  const opts = { hour: '2-digit', minute: '2-digit' };
-  const sameDay = d.toDateString() === now.toDateString();
-  const tomorrow = new Date(now.getTime() + 86400000).toDateString() === d.toDateString();
-  if (sameDay) return '今 ' + d.toLocaleTimeString('zh-CN', opts);
-  if (tomorrow) return '明 ' + d.toLocaleTimeString('zh-CN', opts);
-  return d.toLocaleDateString('zh-CN', {month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('zh-CN', opts);
-}
-
-function formatDuration(ms) {
-  if (ms < 0) return '已过';
-  const s = Math.floor(ms / 1000);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (h > 0) return `${h}h ${m}min`;
-  if (m > 0) return `${m}min`;
-  return `${s}s`;
-}
-
-function formatCountdown(ms) {
-  if (ms < 0) return '00:00';
-  const s = Math.floor(ms / 1000);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-  return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
-}
-
-function toLocalIsoForInput(d) {
-  const pad = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-// 返回"下一个周五 08:00"的毫秒时间戳（本地时区）
-// 如果今天是周五且已过 08:00，返回 null 表示本周提示窗口已过（双倍窗口近在眼前或已开始）
-function nextFridayEightAM(nowMs) {
-  const d = new Date(nowMs);
-  const day = d.getDay();  // 0=周日 ... 5=周五
-  if (day === 5) {
-    const today8 = new Date(d);
-    today8.setHours(8, 0, 0, 0);
-    if (nowMs >= today8.getTime()) return null;
-    return today8.getTime();
-  }
-  const daysToFriday = (5 - day + 7) % 7;
-  const target = new Date(d);
-  target.setDate(d.getDate() + daysToFriday);
-  target.setHours(8, 0, 0, 0);
-  return target.getTime();
-}
+// Helpers (formatDateTime / formatDuration / formatCountdown / toLocalIsoForInput / nextFridayEightAM / isAppleDevice) 已移到 common.js
 
 // ========== 日历订阅（.ics 生成已搬到 Supabase Edge Function）==========
-
-// Apple 设备（iOS/iPadOS/macOS）统一走 webcal:// —— 系统自带日历 app，点击可触发原生"订阅"对话框
-// Windows/Android/Linux 走 https:// —— 浏览器按 MIME 处理，下载或交给已注册的日历软件
-function isAppleDevice() {
-  const ua = navigator.userAgent;
-  if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return true;
-  if (/Macintosh|Mac OS X/.test(ua)) return true;
-  return false;
-}
 
 // 打开订阅链接（Edge Function 托管的 .ics）
 // 参数形式：{ cropId, path } 单作物 | { user, path } 用户级聚合
@@ -899,14 +999,29 @@ function app() {
     refreshing: false,
     // 好友圈提醒列表：{ crop, windowB, isLastWaterNow } 对象数组
     friendAlerts: [],
+    // 收藏 modal（从已收获作物打开）
+    collectOpen: false,
+    collectForm: {
+      source_crop_id: null,  // 指向主工具那棵已收获 crop，保证一棵只能收藏一次
+      crop_type: 8,
+      crop_name: '',
+      harvested_at: null,
+      mutations: [],
+      note: '',
+      is_public: false,
+      image_url: null,       // 已上传的截图 URL
+    },
+    collectImageFile: null,  // 选图后未上传的本地 File（用来本地预览）
+    collectLoading: false,
+    // 已经被收入纪念册的 crop.id 列表，用来让主工具的按钮变"已收入"状态
+    collectedCropIds: [],
 
     // --- init ---
     async init() {
-      if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+      if (!initSbClient()) {
         alert('Supabase 库没加载成功，检查网络或 CDN 可达性');
         return;
       }
-      sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
       const saved = localStorage.getItem('wz_me');
       if (saved) {
@@ -1019,6 +1134,29 @@ function app() {
       this.crops = list;
       // 顺带刷新好友圈即熟提醒（只有在自己视图且登录态下会真正拉）
       await this.loadFriendAlerts();
+      // 查当前已收获作物里哪些已经收入纪念册（防二次收入）
+      await this.loadCollectedCropIds();
+    },
+
+    // 查 collections 表里哪些 source_crop_id 对应当前列表的作物
+    // 只对自己视图下的已收获作物有意义
+    async loadCollectedCropIds() {
+      if (this.viewingFriend || !this.me) {
+        this.collectedCropIds = [];
+        return;
+      }
+      const cropIds = this.crops.filter(c => c.harvested_at).map(c => c.id);
+      if (cropIds.length === 0) {
+        this.collectedCropIds = [];
+        return;
+      }
+      const { data, error } = await sbClient
+        .from('collections')
+        .select('source_crop_id')
+        .eq('user_nickname', this.me.nickname)
+        .in('source_crop_id', cropIds);
+      if (error) { this.collectedCropIds = []; return; }
+      this.collectedCropIds = (data || []).map(r => r.source_crop_id).filter(Boolean);
     },
 
     // 拉好友圈（FRIEND_LIST 里除自己外的人）未收获作物，筛出"现在或 1h 内可浇水即熟"的
@@ -1637,6 +1775,123 @@ function app() {
           alert('重种失败：' + (e.message || e));
         }
       });
+    },
+
+    // --- 收藏纪念册 ---
+    // 打开收藏 modal：从已收获作物继承 type/name/harvested_at/id
+    openCollect(crop) {
+      this.collectForm = {
+        source_crop_id: crop.id,
+        crop_type: crop.type,
+        crop_name: crop.name || '',
+        harvested_at: crop.harvested_at,
+        mutations: [],
+        note: '',
+        is_public: false,
+        image_url: null,
+      };
+      this.collectImageFile = null;
+      this.collectOpen = true;
+    },
+
+    // --- 截图选择与预览 ---
+    onCollectImageSelect(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (!file.type || !file.type.startsWith('image/')) {
+        alert('只能选图片');
+        event.target.value = '';
+        return;
+      }
+      this.collectImageFile = file;
+    },
+    collectImagePreview() {
+      if (this.collectImageFile) return URL.createObjectURL(this.collectImageFile);
+      return this.collectForm.image_url || '';
+    },
+    clearCollectImage() {
+      this.collectImageFile = null;
+      this.collectForm.image_url = null;
+    },
+    // 某变异类型是否已被选中
+    hasMutation(type) {
+      return this.collectForm.mutations.some(m => m.type === type);
+    },
+    // 切换非紫色类型（hero / giant / normal）
+    toggleMutation(type) {
+      const idx = this.collectForm.mutations.findIndex(m => m.type === type);
+      if (idx >= 0) {
+        this.collectForm.mutations.splice(idx, 1);
+      } else {
+        if (this.collectForm.mutations.length >= 3) return;
+        this.collectForm.mutations.push({ type });
+      }
+    },
+    // 切换紫色（默认选"青玉"子名，子名可再改）
+    togglePurple() {
+      if (this.hasMutation('purple')) {
+        this.collectForm.mutations = this.collectForm.mutations.filter(m => m.type !== 'purple');
+      } else {
+        if (this.collectForm.mutations.length >= 3) return;
+        this.collectForm.mutations.push({ type: 'purple', name: '青玉' });
+      }
+    },
+    purpleSubname() {
+      const p = this.collectForm.mutations.find(m => m.type === 'purple');
+      return p ? p.name : null;
+    },
+    setPurpleSubname(sub) {
+      const p = this.collectForm.mutations.find(m => m.type === 'purple');
+      if (p) p.name = sub;
+    },
+    // 保存收藏到 collections 表
+    async saveCollect() {
+      if (!this.me) return;
+      this.collectLoading = true;
+      try {
+        // 若有新选的截图，先上传拿 URL 再写 DB
+        if (this.collectImageFile) {
+          try {
+            this.collectForm.image_url = await uploadImage(this.collectImageFile, this.me.nickname);
+            this.collectImageFile = null;
+          } catch (e) {
+            alert('截图上传失败（仅截图失败，收藏本身会正常保存）：' + (e.message || e));
+            // 失败降级：不带截图继续保存
+            this.collectImageFile = null;
+            this.collectForm.image_url = null;
+          }
+        }
+        const payload = {
+          source_crop_id: this.collectForm.source_crop_id,
+          crop_type: this.collectForm.crop_type,
+          crop_name: (this.collectForm.crop_name || '').trim(),
+          harvested_at: this.collectForm.harvested_at,
+          mutations: this.collectForm.mutations,
+          note: (this.collectForm.note || '').trim(),
+          is_public: this.collectForm.is_public,
+          image_url: this.collectForm.image_url || '',
+        };
+        const { data, error } = await sbClient.rpc('collection_write', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_action: 'insert',
+          p_row_id: null,
+          p_payload: payload,
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        // 本地立即标记已收入，按钮马上变灰（不用等 loadCrops）
+        if (this.collectForm.source_crop_id &&
+            !this.collectedCropIds.includes(this.collectForm.source_crop_id)) {
+          this.collectedCropIds.push(this.collectForm.source_crop_id);
+        }
+        this.collectOpen = false;
+        this.showToast('🏆 已收入纪念册');
+      } catch (e) {
+        alert('收藏失败：' + (e.message || e));
+      } finally {
+        this.collectLoading = false;
+      }
     },
 
     // --- UI helpers ---
