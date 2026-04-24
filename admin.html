@@ -77,6 +77,16 @@
         <button @click="tab='feed'"
           :class="tab==='feed' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600'"
           class="px-4 py-1.5 rounded-full shadow-sm font-semibold">👥 朋友圈</button>
+        <button @click="tab='review'"
+          :class="tab==='review' ? 'bg-rose-600 text-white' : 'bg-white text-slate-600'"
+          class="relative px-4 py-1.5 rounded-full shadow-sm font-semibold">
+          🔍 审查
+          <template x-if="unreviewedCount > 0">
+            <span class="ml-1 inline-flex items-center justify-center text-[10px] rounded-full w-5 h-5"
+              :class="tab==='review' ? 'bg-white text-rose-600' : 'bg-rose-500 text-white'"
+              x-text="unreviewedCount"></span>
+          </template>
+        </button>
       </div>
 
       <!-- ============ TAB: 作物 ============ -->
@@ -115,13 +125,21 @@
                     <span x-text="cropCountFor(u.nickname, 'mature') + ' 待收 · '"></span>
                     <span x-text="cropCountFor(u.nickname, 'harvested') + ' 已收'"></span>
                   </span>
-                  <!-- 管理员自己不显示封号按钮 -->
-                  <template x-if="u.nickname !== ADMIN_NICKNAME">
-                    <button @click="askBan(u)"
-                      :class="u.banned ? 'text-emerald-600 hover:text-emerald-700' : 'text-red-500 hover:text-red-700'"
-                      x-text="u.banned ? '🔓 解封' : '🚫 封号'"
-                      class="font-semibold"></button>
-                  </template>
+                  <!-- 管理员自己不显示封号 / 删号按钮；重置 PIN 对所有用户（含 admin）都可用 -->
+                  <div class="flex items-center gap-2">
+                    <button @click="askResetPin(u)"
+                      class="text-sky-600 hover:text-sky-700 font-semibold">🔑 重置 PIN</button>
+                    <template x-if="u.nickname !== ADMIN_NICKNAME">
+                      <button @click="askBan(u)"
+                        :class="u.banned ? 'text-emerald-600 hover:text-emerald-700' : 'text-red-500 hover:text-red-700'"
+                        x-text="u.banned ? '🔓 解封' : '🚫 封号'"
+                        class="font-semibold"></button>
+                    </template>
+                    <template x-if="u.nickname !== ADMIN_NICKNAME">
+                      <button @click="askDeleteUser(u)"
+                        class="text-red-700 hover:text-red-900 font-semibold">💣 删号</button>
+                    </template>
+                  </div>
                 </div>
               </div>
               <div class="divide-y">
@@ -308,6 +326,115 @@
         </div>
       </template>
 
+      <!-- ============ TAB: 审查 🔍（集中查所有 collections，含 UGC 内容）============ -->
+      <template x-if="tab === 'review'">
+        <div class="space-y-4">
+          <div class="text-xs text-slate-500">
+            审查视图：按时间倒序显示所有收藏条目（含非公开）。审查状态存 DB，跨设备共享。
+          </div>
+
+          <!-- 状态筛选 + 人筛选 -->
+          <div class="flex items-center gap-2 text-sm flex-wrap">
+            <span class="text-slate-500">状态：</span>
+            <button @click="reviewFilter='all'"
+              :class="reviewFilter==='all' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'"
+              class="px-3 py-1 rounded-full shadow-sm"
+              x-text="'全部 · ' + collections.length"></button>
+            <button @click="reviewFilter='unreviewed'"
+              :class="reviewFilter==='unreviewed' ? 'bg-rose-500 text-white' : 'bg-white text-slate-600'"
+              class="px-3 py-1 rounded-full shadow-sm"
+              x-text="'未审 · ' + unreviewedCount"></button>
+            <button @click="reviewFilter='reviewed'"
+              :class="reviewFilter==='reviewed' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600'"
+              class="px-3 py-1 rounded-full shadow-sm"
+              x-text="'已审 · ' + reviewedCount"></button>
+          </div>
+          <div class="flex items-center gap-2 text-sm flex-wrap">
+            <span class="text-slate-500">用户：</span>
+            <select x-model="reviewUserFilter" class="border rounded px-2 py-1 text-sm">
+              <option value="">全部用户</option>
+              <template x-for="u in usersWithCollections" :key="u.nickname">
+                <option :value="u.nickname" x-text="u.nickname"></option>
+              </template>
+            </select>
+          </div>
+
+          <!-- 条目列表（按时间 desc）-->
+          <template x-for="c in reviewItems" :key="c.id">
+            <div class="bg-white rounded-xl shadow p-4 space-y-2"
+              :class="isReviewed(c.id) ? 'border-l-4 border-emerald-400' : 'border-l-4 border-rose-400'">
+              <div class="flex items-start gap-3">
+                <span class="text-2xl" x-text="{8:'🌾',16:'🌽',32:'🫐'}[c.crop_type]"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-sm" x-text="c.user_nickname"></span>
+                    <span class="text-slate-400">·</span>
+                    <span class="font-semibold" :class="topMutationTextClass(c.mutations)"
+                      x-text="c.crop_name || '作物'"></span>
+                    <span class="font-bold text-sm"
+                      :class="topMutationTextClass(c.mutations) || 'text-slate-500'"
+                      x-text="totalMultiplier(c.mutations) + '×'"></span>
+                    <template x-if="c.is_public">
+                      <span class="text-[11px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">👥 公开</span>
+                    </template>
+                    <template x-if="!c.is_public">
+                      <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">🔒 私密</span>
+                    </template>
+                    <template x-if="isReviewed(c.id)">
+                      <span class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700"
+                        x-text="'✓ ' + reviewedByFor(c.id)"></span>
+                    </template>
+                    <span class="text-[11px] text-slate-400 ml-auto" x-text="formatDateTime(c.created_at)"></span>
+                  </div>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <template x-for="m in sortedMutations(c.mutations)" :key="m.type + (m.name || '')">
+                      <span class="text-[11px] px-2 py-0.5 rounded-full"
+                        :class="mutationBadgeClass(m)"
+                        x-text="mutationBadgeLabel(m)"></span>
+                    </template>
+                    <template x-if="!c.mutations || c.mutations.length === 0">
+                      <span class="text-[11px] text-slate-400">无变异</span>
+                    </template>
+                  </div>
+                  <template x-if="c.note">
+                    <div class="text-sm text-slate-600 italic mt-1 break-words" x-text="'&quot;' + c.note + '&quot;'"></div>
+                  </template>
+                  <template x-if="c.image_url">
+                    <img :src="c.image_url" @click="lightboxUrl = c.image_url"
+                      class="w-full max-h-64 object-cover rounded mt-2 cursor-zoom-in" />
+                  </template>
+                </div>
+              </div>
+              <!-- 操作 -->
+              <div class="flex items-center gap-3 text-xs justify-end pt-2 border-t flex-wrap">
+                <template x-if="isReviewed(c.id)">
+                  <button @click="toggleReview(c, false)"
+                    class="text-slate-500 hover:text-slate-700 font-semibold">↩ 取消审查</button>
+                </template>
+                <template x-if="!isReviewed(c.id)">
+                  <button @click="toggleReview(c, true)"
+                    class="text-emerald-600 hover:text-emerald-700 font-semibold">✓ 标记已审</button>
+                </template>
+                <button @click="openEdit(c)"
+                  class="text-sky-600 hover:text-sky-700 font-semibold">✏️ 编辑</button>
+                <button @click="togglePublic(c)"
+                  class="text-amber-600 hover:text-amber-700 font-semibold"
+                  x-text="c.is_public ? '🔒 改私密' : '👥 改公开'"></button>
+                <button @click="askDelete({type:'collection', id:c.id, desc:'收藏 · '+(c.crop_name||'作物')+' · '+c.user_nickname})"
+                  class="text-red-500 hover:text-red-700 font-semibold">🗑️ 删除</button>
+              </div>
+            </div>
+          </template>
+
+          <template x-if="reviewItems.length === 0">
+            <div class="text-center text-slate-400 py-12 bg-white rounded-xl shadow">
+              <div class="text-4xl mb-2">✨</div>
+              <div>没有符合筛选的条目</div>
+            </div>
+          </template>
+        </div>
+      </template>
+
       <div class="text-[11px] text-slate-400 text-center py-2">
         数据同步时间 <span x-text="formatDateTime(lastLoadAt)"></span>
       </div>
@@ -415,6 +542,68 @@
     </div>
   </template>
 
+  <!-- ============ 重置 PIN Modal ============ -->
+  <template x-if="resetPinTarget">
+    <div class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+         @click="resetPinTarget = null">
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3" @click.stop>
+        <h3 class="font-bold text-lg text-sky-700">🔑 重置 PIN</h3>
+        <div class="text-sm text-slate-700">
+          给用户 <b x-text="resetPinTarget.nickname"></b> 设置新的 4 位数字 PIN：
+        </div>
+        <input x-model="resetPinInput" maxlength="4" inputmode="numeric" type="password"
+          placeholder="新 PIN（4 位数字）"
+          class="w-full border rounded px-3 py-2 text-sm text-center text-lg tracking-widest" />
+        <div class="text-xs text-slate-500">
+          ❗ 设置后请<b>口头告诉用户</b>新 PIN，用户下次登录就可以用新 PIN 了
+        </div>
+        <div class="flex gap-2 justify-end pt-2">
+          <button @click="resetPinTarget = null"
+            class="px-4 py-2 rounded bg-slate-100 text-slate-600 text-sm">取消</button>
+          <button @click="confirmResetPin()"
+            :disabled="resetPinLoading || !/^[0-9]{4}$/.test(resetPinInput)"
+            class="px-4 py-2 rounded bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold disabled:opacity-30"
+            x-text="resetPinLoading ? '处理中…' : '✅ 设置新 PIN'"></button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============ 删号确认 Modal（危险操作，双重确认）============ -->
+  <template x-if="deleteUserTarget">
+    <div class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+         @click="cancelDeleteUser()">
+      <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-5 space-y-3" @click.stop>
+        <h3 class="font-bold text-lg text-red-700">💣 永久删除用户</h3>
+        <div class="text-sm text-slate-700">
+          即将**彻底删除**用户 <b x-text="deleteUserTarget.nickname"></b> 及其所有数据：
+        </div>
+        <div class="bg-red-50 border border-red-200 rounded p-3 text-xs text-red-700 space-y-1">
+          <div>🌱 作物 <b x-text="deleteUserTarget.stats.crops"></b> 棵（含已收获）</div>
+          <div>🏆 纪念册条目 <b x-text="deleteUserTarget.stats.collections"></b> 条（含截图 <b x-text="deleteUserTarget.stats.images"></b> 张）</div>
+          <div>❤️ 点赞 <b x-text="deleteUserTarget.stats.likes"></b> 次 / ❓ 问号 <b x-text="deleteUserTarget.stats.questions"></b> 次</div>
+          <div>🤝 好友关系 <b x-text="deleteUserTarget.stats.friendships"></b> 对 / 好友申请 <b x-text="deleteUserTarget.stats.requests"></b> 条</div>
+        </div>
+        <div class="text-xs text-red-600">
+          ❗ 此操作<b>不可撤销</b>。其他用户的数据不受影响（不会误删别人的作物/收藏）。
+        </div>
+        <div class="text-sm text-slate-700 pt-2">
+          为防止误操作，请在下方输入要删除的昵称 <b x-text="deleteUserTarget.nickname"></b> 确认：
+        </div>
+        <input x-model="deleteUserConfirmInput" placeholder="输入昵称"
+          class="w-full border rounded px-3 py-2 text-sm" />
+        <div class="flex gap-2 justify-end pt-2">
+          <button @click="cancelDeleteUser()"
+            class="px-4 py-2 rounded bg-slate-100 text-slate-600 text-sm">取消</button>
+          <button @click="confirmDeleteUser()"
+            :disabled="deleteUserLoading || deleteUserConfirmInput !== deleteUserTarget.nickname"
+            class="px-4 py-2 rounded bg-red-700 hover:bg-red-800 text-white text-sm font-semibold disabled:opacity-30"
+            x-text="deleteUserLoading ? '删除中…' : '💣 永久删除'"></button>
+        </div>
+      </div>
+    </div>
+  </template>
+
   <!-- ============ 图片 Lightbox ============ -->
   <template x-if="lightboxUrl">
     <div class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-zoom-out"
@@ -465,7 +654,12 @@ function admin() {
     collections: [],
     likes: [],
     questions: [],
+    reviews: [],                  // collection_reviews：{collection_id, reviewed_by, reviewed_at}
     lastLoadAt: null,
+
+    // 审查 tab 筛选
+    reviewFilter: 'unreviewed',   // 'all' | 'unreviewed' | 'reviewed'
+    reviewUserFilter: '',         // '' = 全部用户，否则是 nickname
 
     // 编辑 collection 状态
     editingCollection: null,  // 当前正在编辑的条目
@@ -479,6 +673,16 @@ function admin() {
     // 封号确认
     banTarget: null,          // { nickname, banned }（banned = 当前状态，true 表示已封想解封）
     banLoading: false,
+
+    // 删号双重确认（输入昵称匹配才能点确认删）
+    deleteUserTarget: null,         // { nickname, stats: {crops, collections, images, likes, questions, friendships, requests} }
+    deleteUserConfirmInput: '',
+    deleteUserLoading: false,
+
+    // 重置 PIN
+    resetPinTarget: null,           // { nickname }
+    resetPinInput: '',
+    resetPinLoading: false,
 
     // 图片预览
     lightboxUrl: null,
@@ -552,30 +756,28 @@ function admin() {
     },
 
     async loadAll() {
-      const [usersRes, cropsRes, collsRes, likesRes, qsRes] = await Promise.all([
+      const [usersRes, cropsRes, collsRes, likesRes, qsRes, reviewsRes] = await Promise.all([
         sbClient.from('users').select('nickname, created_at, banned').order('created_at', { ascending: false }),
         sbClient.from('crops').select('*').order('planted_at', { ascending: false }),
         sbClient.from('collections').select('*').order('created_at', { ascending: false }),
         sbClient.from('collection_likes').select('collection_id, user_nickname'),
         sbClient.from('collection_questions').select('collection_id, user_nickname'),
+        sbClient.from('collection_reviews').select('collection_id, reviewed_by, reviewed_at'),
       ]);
       this.users = usersRes.data || [];
       this.crops = cropsRes.data || [];
       this.collections = collsRes.data || [];
       this.likes = likesRes.data || [];
       this.questions = qsRes.data || [];
+      this.reviews = reviewsRes.data || [];
       this.lastLoadAt = Date.now();
     },
 
     // ========== 排序 / 派生 ==========
 
     get usersSorted() {
-      return [...this.users].sort((a, b) => {
-        const aActive = this.crops.filter(c => c.user_nickname === a.nickname && !c.harvested_at).length;
-        const bActive = this.crops.filter(c => c.user_nickname === b.nickname && !c.harvested_at).length;
-        if (aActive !== bActive) return bActive - aActive;
-        return new Date(b.created_at) - new Date(a.created_at);
-      });
+      // 按建号时间降序（新用户在上），方便管理员追踪最近注册
+      return [...this.users].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     },
 
     get usersWithCollections() {
@@ -629,6 +831,57 @@ function admin() {
     },
     questionCountFor(collectionId) {
       return this.questions.filter(q => q.collection_id === collectionId).length;
+    },
+
+    // ===== 审查 tab 辅助 =====
+    isReviewed(collectionId) {
+      return this.reviews.some(r => r.collection_id === collectionId);
+    },
+    reviewedByFor(collectionId) {
+      const r = this.reviews.find(x => x.collection_id === collectionId);
+      return r ? r.reviewed_by : '';
+    },
+    get unreviewedCount() {
+      const reviewedIds = new Set(this.reviews.map(r => r.collection_id));
+      return this.collections.filter(c => !reviewedIds.has(c.id)).length;
+    },
+    get reviewedCount() {
+      return this.collections.length - this.unreviewedCount;
+    },
+    get reviewItems() {
+      const reviewedIds = new Set(this.reviews.map(r => r.collection_id));
+      let pool = this.collections;
+      if (this.reviewFilter === 'unreviewed') pool = pool.filter(c => !reviewedIds.has(c.id));
+      else if (this.reviewFilter === 'reviewed') pool = pool.filter(c => reviewedIds.has(c.id));
+      if (this.reviewUserFilter) pool = pool.filter(c => c.user_nickname === this.reviewUserFilter);
+      // collections 已在 loadAll 按 created_at desc 取，保序即可
+      return pool;
+    },
+
+    async toggleReview(c, reviewed) {
+      try {
+        const { data, error } = await sbClient.rpc('admin_review_toggle', {
+          p_admin_nickname: this.me.nickname,
+          p_admin_pin_hash: this.me.pin_hash,
+          p_collection_id: c.id,
+          p_reviewed: !!reviewed,
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        // 本地立即改 reviews 数组，避免等 loadAll
+        if (reviewed) {
+          this.reviews.push({
+            collection_id: c.id,
+            reviewed_by: this.me.nickname,
+            reviewed_at: new Date().toISOString(),
+          });
+        } else {
+          this.reviews = this.reviews.filter(r => r.collection_id !== c.id);
+        }
+        this.showToast(reviewed ? '✓ 已标记审查' : '↩ 已取消');
+      } catch (e) {
+        alert('操作失败：' + (e.message || e));
+      }
     },
 
     cropStatusLabel(c) {
@@ -810,6 +1063,106 @@ function admin() {
         alert('操作失败：' + (e.message || e));
       } finally {
         this.banLoading = false;
+      }
+    },
+
+    // ========== 删号（危险操作）==========
+
+    askDeleteUser(user) {
+      const nick = user.nickname;
+      // 从本地 data 聚合该用户数据规模（预览给管理员看）
+      const userCrops = this.crops.filter(c => c.user_nickname === nick);
+      const userColls = this.collections.filter(c => c.user_nickname === nick);
+      const userImages = userColls.filter(c => c.image_url).length;
+      const userLikes = this.likes.filter(l => l.user_nickname === nick).length;
+      const userQs = this.questions.filter(q => q.user_nickname === nick).length;
+      // friendships / requests 数据未载入，先展示预估（实际删号时后端不关心前端预估）
+      this.deleteUserTarget = {
+        nickname: nick,
+        stats: {
+          crops: userCrops.length,
+          collections: userColls.length,
+          images: userImages,
+          likes: userLikes,
+          questions: userQs,
+          friendships: '?',
+          requests: '?',
+        },
+      };
+      this.deleteUserConfirmInput = '';
+    },
+
+    cancelDeleteUser() {
+      this.deleteUserTarget = null;
+      this.deleteUserConfirmInput = '';
+    },
+
+    async confirmDeleteUser() {
+      if (!this.deleteUserTarget || this.deleteUserLoading) return;
+      // 双重保险：前端也校验一次输入值匹配昵称
+      if (this.deleteUserConfirmInput !== this.deleteUserTarget.nickname) {
+        this.showToast('请输入正确的昵称确认');
+        return;
+      }
+      this.deleteUserLoading = true;
+      const nick = this.deleteUserTarget.nickname;
+      try {
+        const { data, error } = await sbClient.rpc('admin_user_delete', {
+          p_admin_nickname: this.me.nickname,
+          p_admin_pin_hash: this.me.pin_hash,
+          p_target_nickname: nick,
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        // RPC 返回 { ok, image_urls: [...] }；前端逐个清 Storage orphan 图
+        const urls = (data && data.image_urls) || [];
+        if (urls.length > 0) {
+          // 静默清理，失败也不 block
+          await Promise.all(urls.map(u => removeImageByUrl(u).catch(() => {})));
+        }
+        this.showToast(`💣 已删除用户 ${nick}（含 ${urls.length} 张图片）`);
+        this.deleteUserTarget = null;
+        this.deleteUserConfirmInput = '';
+        await this.loadAll();
+      } catch (e) {
+        alert('删号失败：' + (e.message || e));
+      } finally {
+        this.deleteUserLoading = false;
+      }
+    },
+
+    // ========== 重置 PIN ==========
+
+    askResetPin(user) {
+      this.resetPinTarget = { nickname: user.nickname };
+      this.resetPinInput = '';
+    },
+
+    async confirmResetPin() {
+      if (!this.resetPinTarget || this.resetPinLoading) return;
+      if (!/^[0-9]{4}$/.test(this.resetPinInput)) {
+        this.showToast('PIN 必须是 4 位数字');
+        return;
+      }
+      this.resetPinLoading = true;
+      const nick = this.resetPinTarget.nickname;
+      const pin = this.resetPinInput;
+      try {
+        const { data, error } = await sbClient.rpc('admin_user_reset_pin', {
+          p_admin_nickname: this.me.nickname,
+          p_admin_pin_hash: this.me.pin_hash,
+          p_target_nickname: nick,
+          p_new_pin: pin,
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        alert(`✅ 已重置 ${nick} 的 PIN 为 ${pin}\n\n请口头告诉用户，让 TA 下次用这个 PIN 登录。`);
+        this.resetPinTarget = null;
+        this.resetPinInput = '';
+      } catch (e) {
+        alert('重置失败：' + (e.message || e));
+      } finally {
+        this.resetPinLoading = false;
       }
     },
 
