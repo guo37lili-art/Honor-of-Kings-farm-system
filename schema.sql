@@ -521,3 +521,337 @@ end
 $fn$;
 
 grant execute on function public.admin_user_ban(text, text, text, boolean) to anon;
+
+-- ============================================================
+-- 12. 好友系统（v1.1.0）
+-- 双向好友：friendships 表用 user_a < user_b 规范化，双向关系存一行
+-- 朋友圈 is_public=true 语义从"全网可见"改为"好友可见"
+-- ============================================================
+
+create table if not exists public.friendships (
+  user_a       text not null references public.users(nickname) on delete cascade,
+  user_b       text not null references public.users(nickname) on delete cascade,
+  created_at   timestamptz default now(),
+  primary key (user_a, user_b),
+  check (user_a < user_b)   -- 规范化：字典序小的在前，防重复
+);
+create index if not exists friendships_b_idx on public.friendships(user_b);
+
+alter table public.friendships enable row level security;
+drop policy if exists "public read friendships" on public.friendships;
+create policy "public read friendships" on public.friendships for select using (true);
+grant select on public.friendships to anon;
+revoke insert, update, delete on public.friendships from anon;
+
+-- 好友申请表
+create table if not exists public.friend_requests (
+  id           uuid primary key default gen_random_uuid(),
+  from_user    text not null references public.users(nickname) on delete cascade,
+  to_user      text not null references public.users(nickname) on delete cascade,
+  status       text not null default 'pending'
+                 check (status in ('pending','accepted','rejected')),
+  created_at   timestamptz default now(),
+  responded_at timestamptz,
+  check (from_user <> to_user)
+);
+-- partial unique：同一对 from→to 只能有一条 pending，历史已处理的不占名额
+create unique index if not exists friend_requests_pending_uniq
+  on public.friend_requests(from_user, to_user)
+  where status = 'pending';
+create index if not exists friend_requests_to_idx
+  on public.friend_requests(to_user, status) where status = 'pending';
+
+alter table public.friend_requests enable row level security;
+drop policy if exists "public read friend_requests" on public.friend_requests;
+create policy "public read friend_requests" on public.friend_requests for select using (true);
+grant select on public.friend_requests to anon;
+revoke insert, update, delete on public.friend_requests from anon;
+
+-- ============================================================
+-- 13. 好友系统 helpers
+-- ============================================================
+
+-- PIN + banned 综合校验（后续所有用户态 RPC 共用）
+create or replace function public._check_pin(p_nick text, p_hash text)
+returns boolean
+language sql stable
+set search_path = public
+as $fn$
+  select exists(
+    select 1 from public.users
+    where nickname = p_nick and pin_hash = p_hash and not coalesce(banned, false)
+  );
+$fn$;
+
+-- 两人是否好友
+create or replace function public.is_friend(p_a text, p_b text)
+returns boolean
+language sql stable
+set search_path = public
+as $fn$
+  select exists (
+    select 1 from public.friendships
+    where user_a = least(p_a, p_b) and user_b = greatest(p_a, p_b)
+  );
+$fn$;
+grant execute on function public.is_friend(text, text) to anon;
+
+-- ============================================================
+-- 14. 好友系统 RPC
+-- ============================================================
+
+-- 14.1 发送好友申请
+-- 若对方已向我申请 pending → 自动互接受（竞态处理）
+create or replace function public.friend_request_send(
+  p_nickname text, p_pin_hash text, p_target text
+) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $fn$
+begin
+  if not public._check_pin(p_nickname, p_pin_hash) then
+    return jsonb_build_object('error', 'auth_failed');
+  end if;
+  if p_target = p_nickname then
+    return jsonb_build_object('error', 'cannot_befriend_self');
+  end if;
+  if not exists (
+    select 1 from public.users where nickname = p_target and not coalesce(banned, false)
+  ) then
+    return jsonb_build_object('error', 'target_not_found');
+  end if;
+  if public.is_friend(p_nickname, p_target) then
+    return jsonb_build_object('error', 'already_friends');
+  end if;
+  -- 对方已申请 pending → 自动互接受
+  if exists (
+    select 1 from public.friend_requests
+    where from_user = p_target and to_user = p_nickname and status = 'pending'
+  ) then
+    update public.friend_requests
+      set status = 'accepted', responded_at = now()
+      where from_user = p_target and to_user = p_nickname and status = 'pending';
+    insert into public.friendships(user_a, user_b)
+      values (least(p_nickname, p_target), greatest(p_nickname, p_target))
+      on conflict do nothing;
+    return jsonb_build_object('ok', true, 'auto_accepted', true);
+  end if;
+  -- 正常插入；partial unique 兜底
+  insert into public.friend_requests(from_user, to_user)
+    values (p_nickname, p_target)
+    on conflict do nothing;
+  return jsonb_build_object('ok', true);
+end
+$fn$;
+
+grant execute on function public.friend_request_send(text, text, text) to anon;
+
+-- 14.2 响应好友申请（同意/拒绝）
+create or replace function public.friend_request_respond(
+  p_nickname text, p_pin_hash text, p_request_id uuid, p_accept boolean
+) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $fn$
+declare
+  v_from text;
+  v_to   text;
+  v_status text;
+begin
+  if not public._check_pin(p_nickname, p_pin_hash) then
+    return jsonb_build_object('error', 'auth_failed');
+  end if;
+  select from_user, to_user, status into v_from, v_to, v_status
+    from public.friend_requests where id = p_request_id;
+  if v_to is null then return jsonb_build_object('error', 'not_found'); end if;
+  if v_to <> p_nickname then return jsonb_build_object('error', 'not_recipient'); end if;
+  if v_status <> 'pending' then return jsonb_build_object('error', 'not_pending'); end if;
+
+  update public.friend_requests
+    set status = case when p_accept then 'accepted' else 'rejected' end,
+        responded_at = now()
+    where id = p_request_id;
+
+  if p_accept then
+    insert into public.friendships(user_a, user_b)
+      values (least(v_from, v_to), greatest(v_from, v_to))
+      on conflict do nothing;
+  end if;
+  return jsonb_build_object('ok', true, 'from_user', v_from);
+end
+$fn$;
+
+grant execute on function public.friend_request_respond(text, text, uuid, boolean) to anon;
+
+-- 14.3 列出自己的好友
+create or replace function public.friend_list(p_nickname text, p_pin_hash text)
+returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $fn$
+begin
+  if not public._check_pin(p_nickname, p_pin_hash) then
+    return jsonb_build_object('error', 'auth_failed');
+  end if;
+  return jsonb_build_object('ok', true, 'data', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'nickname', case when user_a = p_nickname then user_b else user_a end,
+      'since', created_at
+    ) order by created_at desc)
+    from public.friendships
+    where user_a = p_nickname or user_b = p_nickname
+  ), '[]'::jsonb));
+end
+$fn$;
+
+grant execute on function public.friend_list(text, text) to anon;
+
+-- 14.4 列出自己收到的 pending 申请
+create or replace function public.friend_requests_incoming(p_nickname text, p_pin_hash text)
+returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $fn$
+begin
+  if not public._check_pin(p_nickname, p_pin_hash) then
+    return jsonb_build_object('error', 'auth_failed');
+  end if;
+  return jsonb_build_object('ok', true, 'data', coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', id,
+      'from_user', from_user,
+      'created_at', created_at
+    ) order by created_at desc)
+    from public.friend_requests
+    where to_user = p_nickname and status = 'pending'
+  ), '[]'::jsonb));
+end
+$fn$;
+
+grant execute on function public.friend_requests_incoming(text, text) to anon;
+
+-- 14.5 删除好友
+create or replace function public.friend_remove(
+  p_nickname text, p_pin_hash text, p_target text
+) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $fn$
+begin
+  if not public._check_pin(p_nickname, p_pin_hash) then
+    return jsonb_build_object('error', 'auth_failed');
+  end if;
+  delete from public.friendships
+    where user_a = least(p_nickname, p_target) and user_b = greatest(p_nickname, p_target);
+  return jsonb_build_object('ok', true);
+end
+$fn$;
+
+grant execute on function public.friend_remove(text, text, text) to anon;
+
+-- ============================================================
+-- 15. 朋友圈 / 纪念册朋友模式 RPC（is_public 语义切换到"好友可见"）
+-- ============================================================
+
+-- 15.1 朋友圈 feed：返回 me 自己 + me 好友 的 is_public=true 条目
+-- 结构 1:1 对齐现有 Web feed.loadFeed 的 .select('*, collection_likes(user_nickname), collection_questions(user_nickname)')
+create or replace function public.feed_for_user(p_nickname text, p_pin_hash text)
+returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $fn$
+declare v_rows jsonb;
+begin
+  if not public._check_pin(p_nickname, p_pin_hash) then
+    return jsonb_build_object('error', 'auth_failed');
+  end if;
+  -- jsonb_agg(t order by ...) 直接聚合 record；比 row_to_jsonb(t) 更稳定（后者在部分 Supabase 环境下 record 重载解析不到）
+  select coalesce(jsonb_agg(t order by t.created_at desc), '[]'::jsonb) into v_rows
+  from (
+    select c.*,
+      coalesce((
+        select jsonb_agg(jsonb_build_object('user_nickname', user_nickname))
+        from public.collection_likes where collection_id = c.id
+      ), '[]'::jsonb) as collection_likes,
+      coalesce((
+        select jsonb_agg(jsonb_build_object('user_nickname', user_nickname))
+        from public.collection_questions where collection_id = c.id
+      ), '[]'::jsonb) as collection_questions
+    from public.collections c
+    where c.is_public = true
+      and (c.user_nickname = p_nickname
+           or public.is_friend(p_nickname, c.user_nickname))
+  ) t;
+  return jsonb_build_object('ok', true, 'data', v_rows);
+end
+$fn$;
+
+grant execute on function public.feed_for_user(text, text) to anon;
+
+-- 15.2 纪念册朋友模式：必须是好友才看得到
+-- 看自己等价于 list 所有条目（含非公开）
+-- 非好友返回 is_friend=false + 空 data
+create or replace function public.collection_friend_list_v2(
+  p_nickname text, p_pin_hash text, p_friend text
+) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $fn$
+begin
+  if not public._check_pin(p_nickname, p_pin_hash) then
+    return jsonb_build_object('error', 'auth_failed');
+  end if;
+  if p_friend = p_nickname then
+    return jsonb_build_object('ok', true, 'is_friend', true,
+      'data', coalesce((
+        select jsonb_agg(c order by c.created_at desc)
+        from public.collections c where c.user_nickname = p_nickname
+      ), '[]'::jsonb));
+  end if;
+  if not public.is_friend(p_nickname, p_friend) then
+    return jsonb_build_object('ok', true, 'is_friend', false, 'data', '[]'::jsonb);
+  end if;
+  return jsonb_build_object('ok', true, 'is_friend', true,
+    'data', coalesce((
+      select jsonb_agg(c order by c.created_at desc)
+      from public.collections c
+      where c.user_nickname = p_friend and c.is_public = true
+    ), '[]'::jsonb));
+end
+$fn$;
+
+grant execute on function public.collection_friend_list_v2(text, text, text) to anon;
+
+-- 15.3 主页朋友视图：必须是好友才能看 TA 的作物（v1.1.0 bug 修复）
+-- 和 collection_friend_list_v2 对称
+create or replace function public.crop_friend_list_v2(
+  p_nickname text, p_pin_hash text, p_friend text
+) returns jsonb
+language plpgsql security definer
+set search_path = public, extensions
+as $fn$
+begin
+  if not public._check_pin(p_nickname, p_pin_hash) then
+    return jsonb_build_object('error', 'auth_failed');
+  end if;
+  if p_friend = p_nickname then
+    -- 看自己 = 查所有作物
+    return jsonb_build_object('ok', true, 'is_friend', true,
+      'data', coalesce((
+        select jsonb_agg(c order by c.planted_at desc)
+        from public.crops c where c.user_nickname = p_nickname
+      ), '[]'::jsonb));
+  end if;
+  if not public.is_friend(p_nickname, p_friend) then
+    return jsonb_build_object('ok', true, 'is_friend', false, 'data', '[]'::jsonb);
+  end if;
+  return jsonb_build_object('ok', true, 'is_friend', true,
+    'data', coalesce((
+      select jsonb_agg(c order by c.planted_at desc)
+      from public.crops c
+      where c.user_nickname = p_friend
+    ), '[]'::jsonb));
+end
+$fn$;
+
+grant execute on function public.crop_friend_list_v2(text, text, text) to anon;

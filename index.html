@@ -81,16 +81,29 @@
     </div>
   </template>
 
-  <!-- ============== Friend View Login Prompt ============== -->
-  <template x-if="viewingFriend && !me">
-    <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center text-sm text-amber-700">
-      你正在查看 <b x-text="viewingFriend"></b> 的农场（只读）。要管理自己的农场请
-      <button @click="viewingFriend=null; updateHash()" class="text-emerald-600 underline">登录</button>
+  <!-- v1.1.0 朋友模式 · 未登录：先登录才能校验好友关系 -->
+  <template x-if="viewingFriend && notLoggedIn">
+    <div class="bg-white rounded-xl shadow p-6 text-center space-y-3">
+      <div class="text-4xl">🔒</div>
+      <div>请先<button @click="viewingFriend=null; updateHash()" class="text-emerald-600 underline">登录</button>，才能查看 <b x-text="viewingFriend"></b> 的农场</div>
+    </div>
+  </template>
+
+  <!-- v1.1.0 朋友模式 · 不是好友：锁卡 + 去申请加好友 -->
+  <template x-if="viewingFriend && notFriend && !notLoggedIn">
+    <div class="bg-white rounded-xl shadow p-6 text-center space-y-3">
+      <div class="text-4xl">🔒</div>
+      <div>你和 <b x-text="viewingFriend"></b> 还不是好友</div>
+      <div class="text-sm text-slate-500">看不到 TA 的农场</div>
+      <div>
+        <a :href="'./friends.html?prefill=' + encodeURIComponent(viewingFriend)"
+          class="inline-block bg-violet-600 hover:bg-violet-700 text-white rounded px-4 py-2 text-sm font-semibold">去申请加好友</a>
+      </div>
     </div>
   </template>
 
   <!-- ============== Main App ============== -->
-  <template x-if="me || viewingFriend">
+  <template x-if="(me && !viewingFriend) || (me && viewingFriend && !notFriend)">
     <div class="space-y-4">
 
       <!-- v1.1.0 "好友浇水提醒"横幅已移除；好友改走双向申请（friends.html） -->
@@ -985,6 +998,9 @@ function app() {
     refreshing: false,
     // v1.1.0 好友系统：主页只显示 pending 申请数（红点），横幅已移除
     pendingRequestCount: 0,
+    // v1.1.0 朋友视图锁卡：未登录或非好友 → 看不到 TA 的农场
+    notFriend: false,
+    notLoggedIn: false,
     // 收藏 modal（从已收获作物打开）
     collectOpen: false,
     collectForm: {
@@ -1085,7 +1101,27 @@ function app() {
 
     // --- crops ---
     async loadCrops() {
-      const owner = this.viewingFriend || this.me?.nickname;
+      // v1.1.0 朋友模式：必须登录 + 必须是好友才能看 TA 的作物
+      if (this.viewingFriend) {
+        if (!this.me) {
+          this.crops = []; this.notFriend = true; this.notLoggedIn = true;
+          return;
+        }
+        const { data, error } = await sbClient.rpc('crop_friend_list_v2', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_friend: this.viewingFriend,
+        });
+        if (error) return;
+        if (data && data.ok) {
+          this.notFriend = !data.is_friend;
+          this.notLoggedIn = false;
+          this.crops = data.is_friend ? (data.data || []) : [];
+        }
+        return;
+      }
+      // 自己模式
+      const owner = this.me?.nickname;
       if (!owner) { this.crops = []; return; }
       const { data, error } = await sbClient
         .from('crops')
