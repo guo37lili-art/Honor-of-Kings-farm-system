@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#8b5cf6" />
+<title>好友 · 王者农场助手</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤝</text></svg>" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./common.js?v=8"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  html, body { -webkit-tap-highlight-color: transparent; }
+  [x-cloak] { display: none !important; }
+</style>
+</head>
+<body class="bg-gradient-to-br from-violet-50 to-purple-100 min-h-screen text-slate-800">
+
+<div x-data="friendsApp()" x-cloak class="max-w-2xl mx-auto p-4">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between gap-2 mb-4 pt-2 flex-wrap">
+    <div class="flex items-center gap-2">
+      <h1 class="text-xl font-bold text-violet-700 whitespace-nowrap inline-flex items-center gap-2">
+        <span>🤝</span>
+        <span>好友</span>
+      </h1>
+      <template x-if="me">
+        <button @click="refresh()" :disabled="refreshing" title="刷新"
+          class="text-lg text-violet-600 hover:text-violet-700 disabled:opacity-50 leading-none"
+          :class="{'animate-spin': refreshing}">
+          🔄
+        </button>
+      </template>
+    </div>
+    <div class="text-sm flex items-center gap-3">
+      <a href="./index.html" class="text-emerald-600 hover:text-emerald-700">← 回主页</a>
+      <a href="./feed.html" class="text-sky-600 hover:text-sky-700">👥 朋友圈</a>
+      <template x-if="me">
+        <span class="text-slate-600"><b x-text="me.nickname"></b></span>
+      </template>
+    </div>
+  </header>
+
+  <!-- 未登录拦截 -->
+  <template x-if="!me">
+    <div class="bg-white rounded-xl shadow p-6 text-center space-y-3">
+      <div class="text-4xl">🔒</div>
+      <div>请先到<a href="./index.html" class="text-emerald-600 underline">主页</a>登录，才能管理好友</div>
+    </div>
+  </template>
+
+  <!-- 主区 -->
+  <template x-if="me">
+  <div class="space-y-4">
+
+    <!-- 加好友 -->
+    <div class="bg-white rounded-xl shadow p-4 space-y-2">
+      <div class="font-semibold text-sm">加好友</div>
+      <div class="flex gap-2">
+        <input x-model="addTarget" maxlength="20" placeholder="输入对方昵称"
+          @keydown.enter="sendRequest()"
+          class="flex-1 border rounded px-3 py-2 text-sm" />
+        <button @click="sendRequest()" :disabled="sending || !addTarget.trim()"
+          class="bg-violet-600 hover:bg-violet-700 text-white rounded px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          <span x-text="sending ? '...' : '发送'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Tab 切换 -->
+    <div class="flex items-center gap-2 text-sm">
+      <button @click="tab='friends'"
+        :class="tab==='friends' ? 'bg-violet-600 text-white' : 'bg-white text-slate-600'"
+        class="px-4 py-1.5 rounded-full shadow-sm font-semibold">
+        我的好友 <span x-text="'· ' + friends.length"></span>
+      </button>
+      <button @click="tab='requests'"
+        :class="tab==='requests' ? 'bg-rose-500 text-white' : 'bg-white text-slate-600'"
+        class="relative px-4 py-1.5 rounded-full shadow-sm font-semibold">
+        申请
+        <template x-if="requests.length > 0">
+          <span class="ml-1 inline-flex items-center justify-center bg-rose-500 text-white text-[10px] rounded-full w-5 h-5"
+            :class="tab==='requests' ? 'bg-white text-rose-500' : ''"
+            x-text="requests.length"></span>
+        </template>
+      </button>
+    </div>
+
+    <!-- 好友列表 -->
+    <template x-if="tab === 'friends'">
+      <div class="space-y-2">
+        <template x-for="f in friends" :key="f.nickname">
+          <div class="bg-white rounded-xl shadow p-4 flex items-center gap-3 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold" x-text="f.nickname"></div>
+              <div class="text-xs text-slate-400" x-text="'加好友于 ' + formatDateTime(f.since)"></div>
+            </div>
+            <div class="flex items-center gap-2 text-sm flex-shrink-0">
+              <a :href="'./index.html#/u/' + encodeURIComponent(f.nickname)"
+                class="text-emerald-600 hover:text-emerald-700">看 TA 农场</a>
+              <a :href="'./collection.html#/u/' + encodeURIComponent(f.nickname)"
+                class="text-amber-600 hover:text-amber-700">看 TA 纪念册</a>
+              <button @click="removeFriend(f.nickname)"
+                class="text-red-500 hover:text-red-700">删好友</button>
+            </div>
+          </div>
+        </template>
+        <template x-if="friends.length === 0">
+          <div class="text-center text-slate-400 py-12 bg-white rounded-xl shadow">
+            <div class="text-4xl mb-2">🌱</div>
+            <div>还没有好友 · 去顶部加一个</div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- 申请列表 -->
+    <template x-if="tab === 'requests'">
+      <div class="space-y-2">
+        <template x-for="r in requests" :key="r.id">
+          <div class="bg-white rounded-xl shadow p-4 flex items-center gap-3 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <div class="text-sm">
+                <b x-text="r.from_user"></b>
+                <span class="text-slate-500">想加你为好友</span>
+              </div>
+              <div class="text-xs text-slate-400" x-text="formatDateTime(r.created_at)"></div>
+            </div>
+            <div class="flex items-center gap-2 text-sm flex-shrink-0">
+              <button @click="respondRequest(r, true)" :disabled="busyIds.includes(r.id)"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white rounded px-3 py-1 disabled:opacity-50">同意</button>
+              <button @click="respondRequest(r, false)" :disabled="busyIds.includes(r.id)"
+                class="bg-slate-200 hover:bg-slate-300 text-slate-700 rounded px-3 py-1 disabled:opacity-50">拒绝</button>
+            </div>
+          </div>
+        </template>
+        <template x-if="requests.length === 0">
+          <div class="text-center text-slate-400 py-12 bg-white rounded-xl shadow">
+            <div class="text-4xl mb-2">📭</div>
+            <div>暂无新申请</div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+  </div>
+  </template>
+
+  <!-- Toast -->
+  <template x-if="toast">
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white rounded-full px-4 py-2 text-sm shadow-lg z-50"
+         x-text="toast"></div>
+  </template>
+
+</div>
+
+<script>
+function friendsApp() {
+  return {
+    me: null,
+    tab: 'friends',            // 'friends' | 'requests'
+    friends: [],
+    requests: [],
+    addTarget: '',
+    sending: false,
+    busyIds: [],
+    refreshing: false,
+    toast: '',
+
+    async init() {
+      if (!initSbClient()) {
+        alert('Supabase 库没加载成功，检查网络或 CDN 可达性');
+        return;
+      }
+      this.me = loadSavedMe();
+      if (!this.me) return;
+      // URL ?prefill=xxx：从纪念册锁卡跳过来时预填加好友昵称
+      const params = new URLSearchParams(location.search);
+      const prefill = params.get('prefill');
+      if (prefill) this.addTarget = prefill;
+      await this.loadAll();
+    },
+
+    async loadAll() {
+      await Promise.all([this.loadFriends(), this.loadRequests()]);
+    },
+
+    async loadFriends() {
+      const { data, error } = await sbClient.rpc('friend_list', {
+        p_nickname: this.me.nickname, p_pin_hash: this.me.pin_hash,
+      });
+      if (error) return;
+      if (data && data.ok) this.friends = data.data || [];
+    },
+
+    async loadRequests() {
+      const { data, error } = await sbClient.rpc('friend_requests_incoming', {
+        p_nickname: this.me.nickname, p_pin_hash: this.me.pin_hash,
+      });
+      if (error) return;
+      if (data && data.ok) this.requests = data.data || [];
+    },
+
+    async refresh() {
+      if (this.refreshing) return;
+      this.refreshing = true;
+      try {
+        await this.loadAll();
+        this.showToast('✅ 已刷新');
+      } finally {
+        this.refreshing = false;
+      }
+    },
+
+    async sendRequest() {
+      const target = (this.addTarget || '').trim();
+      if (!target || this.sending) return;
+      if (target === this.me.nickname) {
+        this.showToast('不能添加自己为好友');
+        return;
+      }
+      this.sending = true;
+      try {
+        const { data, error } = await sbClient.rpc('friend_request_send', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_target: target,
+        });
+        if (error) throw error;
+        if (data && data.error) {
+          if (data.error === 'target_not_found') this.showToast('用户不存在');
+          else if (data.error === 'already_friends') this.showToast('你和 ' + target + ' 已经是好友了');
+          else if (data.error === 'cannot_befriend_self') this.showToast('不能添加自己为好友');
+          else this.showToast('失败：' + data.error);
+          return;
+        }
+        if (data && data.auto_accepted) {
+          this.showToast('你和 ' + target + ' 已成为好友');
+          this.addTarget = '';
+          await this.loadAll();
+        } else {
+          this.showToast('已发送好友申请');
+          this.addTarget = '';
+        }
+      } catch (e) {
+        alert('发送失败：' + (e.message || e));
+      } finally {
+        this.sending = false;
+      }
+    },
+
+    async respondRequest(r, accept) {
+      if (this.busyIds.includes(r.id)) return;
+      this.busyIds.push(r.id);
+      try {
+        const { data, error } = await sbClient.rpc('friend_request_respond', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_request_id: r.id,
+          p_accept: accept,
+        });
+        if (error) throw error;
+        if (data && data.error) {
+          this.showToast('失败：' + data.error);
+          return;
+        }
+        this.showToast(accept ? ('已同意 · 你和 ' + r.from_user + ' 成为好友') : '已拒绝');
+        await this.loadAll();
+      } catch (e) {
+        alert('失败：' + (e.message || e));
+      } finally {
+        this.busyIds = this.busyIds.filter(x => x !== r.id);
+      }
+    },
+
+    async removeFriend(nick) {
+      if (!confirm('确认删除好友 ' + nick + '？\n删除后将无法看到 TA 的朋友圈')) return;
+      try {
+        const { data, error } = await sbClient.rpc('friend_remove', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_target: nick,
+        });
+        if (error) throw error;
+        if (data && data.error) { this.showToast('失败：' + data.error); return; }
+        this.showToast('已删除');
+        await this.loadFriends();
+      } catch (e) {
+        alert('失败：' + (e.message || e));
+      }
+    },
+
+    showToast(msg) {
+      this.toast = msg;
+      setTimeout(() => { this.toast = ''; }, 2000);
+    },
+
+    formatDateTime(ts) { return formatDateTime(ts); },
+  };
+}
+</script>
+</body>
+</html>

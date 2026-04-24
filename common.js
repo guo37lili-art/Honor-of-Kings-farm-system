@@ -8,9 +8,9 @@
 const SUPABASE_URL = 'https://eebimxoefmibbxxtmebp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlYmlteG9lZm1pYmJ4eHRtZWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NDIzNzQsImV4cCI6MjA5MjIxODM3NH0.zfHwvQ_o17Q10ZovGdWy9uNzhL_FsD463rUnDpNN180';
 
-// 好友圈（硬编码）：圈内人互相推送"浇水即熟 / 1h 内即将即熟"的作物提醒
-// 未来扩展方案：换成从 localStorage 或 users 表读，代码结构不变
-const FRIEND_LIST = ['长缨', '华山一棵松', 'lc'];
+// v1.1.0 好友系统上线后，"好友浇水提醒"横幅已整体移除
+// 原硬编码 FRIEND_LIST 废弃：['长缨', '华山一棵松', 'lc']
+// 现在"好友"走双向申请流程，见 friends.html
 
 // 时间单位常量
 const HOUR_MS = 3600 * 1000;

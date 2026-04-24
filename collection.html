@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./common.js?v=7"></script>
+<script src="./common.js?v=8"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
   html, body { -webkit-tap-highlight-color: transparent; }
@@ -52,6 +52,9 @@
           <span>朋友圈</span>
         </a>
       </template>
+      <template x-if="!viewingFriend">
+        <a href="./friends.html" class="text-violet-600 hover:text-violet-700">🤝 好友</a>
+      </template>
       <template x-if="viewingFriend">
         <a :href="'./index.html#/u/' + encodeURIComponent(viewingFriend)"
            class="text-emerald-600 hover:text-emerald-700">看 TA 的农场 →</a>
@@ -70,8 +73,29 @@
     </div>
   </template>
 
-  <!-- 主区：自己已登录 或 查看朋友的公开纪念册 -->
-  <template x-if="me || viewingFriend">
+  <!-- 朋友模式 · 未登录拦截（v1.1.0：分享链接进来需要先登录才能校验好友关系） -->
+  <template x-if="!me && viewingFriend">
+    <div class="bg-white rounded-xl shadow p-6 text-center space-y-3">
+      <div class="text-4xl">🔒</div>
+      <div>请先到<a href="./index.html" class="text-emerald-600 underline">主页</a>登录，才能查看 <b x-text="viewingFriend"></b> 的纪念册</div>
+    </div>
+  </template>
+
+  <!-- 朋友模式 · 不是好友锁卡（v1.1.0） -->
+  <template x-if="me && viewingFriend && notFriend && !notLoggedIn">
+    <div class="bg-white rounded-xl shadow p-6 text-center space-y-3">
+      <div class="text-4xl">🔒</div>
+      <div>你和 <b x-text="viewingFriend"></b> 还不是好友</div>
+      <div class="text-sm text-slate-500">看不到 TA 的公开纪念册</div>
+      <div>
+        <a :href="'./friends.html?prefill=' + encodeURIComponent(viewingFriend)"
+          class="inline-block bg-violet-600 hover:bg-violet-700 text-white rounded px-4 py-2 text-sm font-semibold">去申请加好友</a>
+      </div>
+    </div>
+  </template>
+
+  <!-- 主区：自己已登录 或 朋友模式且是好友 -->
+  <template x-if="(me && !viewingFriend) || (me && viewingFriend && !notFriend)">
     <div class="space-y-4">
 
       <!-- 汇总 -->
@@ -396,6 +420,8 @@ function collectionApp() {
   return {
     me: null,
     viewingFriend: null,    // 通过 hash #/u/xxx 进入朋友的公开纪念册，只读
+    notFriend: false,       // v1.1.0：朋友模式下，me 和 viewingFriend 不是好友 → 锁卡
+    notLoggedIn: false,     // v1.1.0：朋友模式但未登录 → 先登录
     collections: [],
     sortBy: 'multiplier',   // 'multiplier' | 'time'
     editOpen: false,
@@ -438,14 +464,24 @@ function collectionApp() {
 
     async loadCollections() {
       if (this.viewingFriend) {
-        // 朋友模式：只看朋友公开的那些
-        const { data, error } = await sbClient
-          .from('collections')
-          .select('*')
-          .eq('user_nickname', this.viewingFriend)
-          .eq('is_public', true)
-          .order('created_at', { ascending: false });
-        if (!error) this.collections = data || [];
+        // 朋友模式（v1.1.0）：必须登录 + 必须是好友才能看 TA 的公开纪念册
+        if (!this.me) {
+          this.collections = [];
+          this.notFriend = true;    // 未登录也走锁卡分支（UI 提示"请先登录"）
+          this.notLoggedIn = true;
+          return;
+        }
+        const { data, error } = await sbClient.rpc('collection_friend_list_v2', {
+          p_nickname: this.me.nickname,
+          p_pin_hash: this.me.pin_hash,
+          p_friend: this.viewingFriend,
+        });
+        if (error) return;
+        if (data && data.ok) {
+          this.notFriend = !data.is_friend;
+          this.notLoggedIn = false;
+          this.collections = data.data || [];
+        }
         return;
       }
       // 自己模式

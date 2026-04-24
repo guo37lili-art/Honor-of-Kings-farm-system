@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👥</text></svg>" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./common.js?v=7"></script>
+<script src="./common.js?v=8"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
   html, body { -webkit-tap-highlight-color: transparent; }
@@ -39,6 +39,7 @@
     <div class="text-sm flex items-center gap-3">
       <a href="./index.html" class="text-emerald-600 hover:text-emerald-700">← 回主页</a>
       <a href="./collection.html" class="text-amber-600 hover:text-amber-700">🏆 纪念册</a>
+      <a href="./friends.html" class="text-violet-600 hover:text-violet-700">🤝 好友</a>
       <template x-if="me">
         <span class="text-slate-600"><b x-text="me.nickname"></b></span>
       </template>
@@ -194,13 +195,15 @@ function feedApp() {
     },
 
     async loadFeed() {
-      // 关联查 likes + questions，前端算 count 和 has*
-      const { data, error } = await sbClient
-        .from('collections')
-        .select('*, collection_likes(user_nickname), collection_questions(user_nickname)')
-        .eq('is_public', true)
-        .order('created_at', { ascending: false });
-      if (!error) this.feedItems = data || [];
+      // v1.1.0：调 feed_for_user RPC，只返 me + me 好友 的 is_public=true 条目
+      // 返回结构 1:1 对齐原 .select(...)：含 collection_likes / collection_questions 嵌套
+      if (!this.me) { this.feedItems = []; return; }
+      const { data, error } = await sbClient.rpc('feed_for_user', {
+        p_nickname: this.me.nickname,
+        p_pin_hash: this.me.pin_hash,
+      });
+      if (error) return;
+      if (data && data.ok) this.feedItems = data.data || [];
     },
 
     async refresh() {

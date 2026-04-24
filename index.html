@@ -8,7 +8,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./common.js?v=7"></script>
+<script src="./common.js?v=8"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>
   html, body { -webkit-tap-highlight-color: transparent; }
@@ -93,31 +93,7 @@
   <template x-if="me || viewingFriend">
     <div class="space-y-4">
 
-      <!-- 好友圈即熟提醒横幅：按人合并一条，点主体跳 TA 农场，点"不再提示"本轮隐藏 -->
-      <template x-if="!viewingFriend && friendAlerts.length > 0">
-        <div class="space-y-2">
-          <template x-for="alert in friendAlerts" :key="alert.user">
-            <div class="bg-gradient-to-r from-red-50 to-amber-50 border-2 border-red-300 rounded-xl overflow-hidden">
-              <a :href="'#/u/' + encodeURIComponent(alert.user)"
-                 class="flex items-center gap-2 px-3 py-2.5 hover:bg-white/40 transition">
-                <span class="text-xl">🔔</span>
-                <div class="flex-1 min-w-0">
-                  <div class="font-semibold text-red-700 text-sm leading-tight">
-                    <b x-text="alert.user"></b> 的作物<template x-if="alert.count > 1"><span x-text="'（' + alert.count + ' 棵）'"></span></template>
-                    · <span x-text="friendAlertSummary(alert)"></span>
-                  </div>
-                  <div class="text-[11px] text-slate-500 mt-0.5">点此去 TA 的农场 · 提醒上线</div>
-                </div>
-                <span class="text-slate-400">›</span>
-              </a>
-              <button @click="dismissFriendAlert(alert)"
-                class="w-full border-t border-red-200 py-1.5 text-[11px] text-slate-500 hover:bg-red-100 hover:text-red-600 transition">
-                ✕ 不再提示（等 TA 浇水后再提醒）
-              </button>
-            </div>
-          </template>
-        </div>
-      </template>
+      <!-- v1.1.0 "好友浇水提醒"横幅已移除；好友改走双向申请（friends.html） -->
 
       <!-- Add + Import buttons -->
       <template x-if="!viewingFriend">
@@ -142,18 +118,27 @@
               📅 订阅全部懒人提醒
             </button>
           </div>
-          <div class="grid grid-cols-2 gap-2">
+          <div class="grid grid-cols-3 gap-2">
             <a href="./collection.html"
-              class="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white rounded-xl py-3 text-center font-semibold shadow-md hover:shadow-lg transition">
-              <span class="text-lg">🏆</span>
-              <span>我的纪念册</span>
+              class="flex items-center justify-center gap-1 bg-gradient-to-r from-amber-400 via-orange-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white rounded-xl py-3 text-center font-semibold shadow-md hover:shadow-lg transition text-sm">
+              <span>🏆</span>
+              <span>纪念册</span>
             </a>
             <a href="./feed.html"
-              class="flex items-center justify-center gap-2 bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-500 hover:from-sky-500 hover:to-indigo-600 text-white rounded-xl py-3 text-center font-semibold shadow-md hover:shadow-lg transition">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+              class="flex items-center justify-center gap-1 bg-gradient-to-r from-sky-400 via-blue-400 to-indigo-500 hover:from-sky-500 hover:to-indigo-600 text-white rounded-xl py-3 text-center font-semibold shadow-md hover:shadow-lg transition text-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
               </svg>
               <span>朋友圈</span>
+            </a>
+            <a href="./friends.html"
+              class="relative flex items-center justify-center gap-1 bg-gradient-to-r from-violet-400 via-purple-400 to-fuchsia-500 hover:from-violet-500 hover:to-fuchsia-600 text-white rounded-xl py-3 text-center font-semibold shadow-md hover:shadow-lg transition text-sm">
+              <span>🤝</span>
+              <span>好友</span>
+              <template x-if="pendingRequestCount > 0">
+                <span class="absolute -top-1 -right-1 inline-flex items-center justify-center bg-rose-500 text-white text-[10px] rounded-full min-w-[1.25rem] h-5 px-1 ring-2 ring-white"
+                  x-text="pendingRequestCount"></span>
+              </template>
             </a>
           </div>
         </div>
@@ -771,7 +756,8 @@
 <!-- ============== App JS ============== -->
 <script>
 
-// CONFIG 和 HOUR_MS / sbClient / FRIEND_LIST 已移到 common.js（通过 head 里的 <script src> 引入）
+// CONFIG 和 HOUR_MS / sbClient 已移到 common.js（通过 head 里的 <script src> 引入）
+// v1.1.0：FRIEND_LIST 已删除（好友系统走双向申请流程，见 friends.html）
 
 // ========== 核心时间算法 ==========
 
@@ -997,8 +983,8 @@ function app() {
     // 进行中的写操作 cropId 列表，防双击产生重复浇水/收获
     busyCrops: [],
     refreshing: false,
-    // 好友圈提醒列表：{ crop, windowB, isLastWaterNow } 对象数组
-    friendAlerts: [],
+    // v1.1.0 好友系统：主页只显示 pending 申请数（红点），横幅已移除
+    pendingRequestCount: 0,
     // 收藏 modal（从已收获作物打开）
     collectOpen: false,
     collectForm: {
@@ -1132,8 +1118,8 @@ function app() {
       }
 
       this.crops = list;
-      // 顺带刷新好友圈即熟提醒（只有在自己视图且登录态下会真正拉）
-      await this.loadFriendAlerts();
+      // v1.1.0 好友圈横幅移除：改为主页好友按钮右上红点；loadPendingRequests 单独调度
+      await this.loadPendingRequests();
       // 查当前已收获作物里哪些已经收入纪念册（防二次收入）
       await this.loadCollectedCropIds();
     },
@@ -1159,93 +1145,17 @@ function app() {
       this.collectedCropIds = (data || []).map(r => r.source_crop_id).filter(Boolean);
     },
 
-    // 拉好友圈（FRIEND_LIST 里除自己外的人）未收获作物，筛出"现在或 1h 内可浇水即熟"的
-    // 按人聚合成一条横幅；已点过"不再提示"且朋友未浇水的不显示
-    async loadFriendAlerts() {
+    // v1.1.0：好友申请红点计数（主页好友按钮右上角显示）
+    async loadPendingRequests() {
       if (this.viewingFriend || !this.me) {
-        this.friendAlerts = [];
+        this.pendingRequestCount = 0;
         return;
       }
-      const myNick = this.me.nickname;
-      if (!FRIEND_LIST.includes(myNick)) {
-        this.friendAlerts = [];
-        return;
-      }
-      const friends = FRIEND_LIST.filter(n => n !== myNick);
-      if (friends.length === 0) {
-        this.friendAlerts = [];
-        return;
-      }
-      const { data, error } = await sbClient
-        .from('crops')
-        .select('*')
-        .in('user_nickname', friends)
-        .is('harvested_at', null);
-      if (error) { this.friendAlerts = []; return; }
-
-      const now = Date.now();
-      const windowMs = 60 * 60 * 1000;  // 1 小时
-      const dismissed = new Set(JSON.parse(localStorage.getItem('wz_dismissed_alerts') || '[]'));
-
-      // 第一步：逐棵作物筛选
-      const cropAlerts = (data || [])
-        .map(c => {
-          const matMs = computeMatTime(c);
-          if (now >= matMs) return null;  // 已自然成熟，浇水已无意义，不提醒
-          const preview = previewWaterEffect(c, now);
-          const windowB = computeWindowB(c);
-          const isLastWaterNow = preview.wouldMature && !preview.inCooldown;
-          const willBeSoon = !isLastWaterNow && (windowB - now >= 0) && (windowB - now <= windowMs);
-          if (!isLastWaterNow && !willBeSoon) return null;
-          // "不再提示"键 = cropId + 当前浇水次数。朋友下次浇水后 key 变化自动恢复提醒
-          const dismissKey = c.id + ':' + (c.water_events?.length || 0);
-          if (dismissed.has(dismissKey)) return null;
-          return { crop: c, windowB, isLastWaterNow };
-        })
-        .filter(Boolean);
-
-      // 第二步：按 user 聚合成单条横幅
-      const byUser = {};
-      for (const ca of cropAlerts) {
-        const u = ca.crop.user_nickname;
-        if (!byUser[u]) byUser[u] = { user: u, crops: [], windowBs: [], hasImmediate: false };
-        byUser[u].crops.push(ca.crop);
-        byUser[u].windowBs.push(ca.windowB);
-        if (ca.isLastWaterNow) byUser[u].hasImmediate = true;
-      }
-      this.friendAlerts = Object.values(byUser).map(g => ({
-        user: g.user,
-        count: g.crops.length,
-        crops: g.crops,
-        hasImmediate: g.hasImmediate,
-        soonestWindowB: Math.min(...g.windowBs),
-      })).sort((a, b) => {
-        if (a.hasImmediate !== b.hasImmediate) return a.hasImmediate ? -1 : 1;
-        return a.soonestWindowB - b.soonestWindowB;
+      const { data, error } = await sbClient.rpc('friend_requests_incoming', {
+        p_nickname: this.me.nickname, p_pin_hash: this.me.pin_hash,
       });
-    },
-
-    // 动态生成横幅文案（跟 this.now 走）；修掉之前"已过 后可浇水即熟"的 stale bug
-    friendAlertSummary(alert) {
-      const anyImmediate = alert.crops.some(c => {
-        const preview = previewWaterEffect(c, this.now);
-        return preview.wouldMature && !preview.inCooldown;
-      });
-      if (anyImmediate) return '现在可浇水即收 🔥';
-      const delta = alert.soonestWindowB - this.now;
-      if (delta <= 0) return '现在可浇水即收 🔥';  // 兜底：越过 windowB 但 preview 因冷却没触发
-      return formatDuration(delta) + ' 后可浇水即熟';
-    },
-
-    // "不再提示"：记录当前这组作物的 cropId + 浇水次数到 localStorage
-    // 朋友下次浇水（水次+1）key 变化，提醒自动恢复
-    dismissFriendAlert(alert) {
-      const dismissed = new Set(JSON.parse(localStorage.getItem('wz_dismissed_alerts') || '[]'));
-      for (const c of alert.crops) {
-        dismissed.add(c.id + ':' + (c.water_events?.length || 0));
-      }
-      localStorage.setItem('wz_dismissed_alerts', JSON.stringify([...dismissed]));
-      this.friendAlerts = this.friendAlerts.filter(a => a !== alert);
+      if (error) return;
+      if (data && data.ok) this.pendingRequestCount = (data.data || []).length;
     },
 
     // 手动刷新：重新拉作物列表并给玩家显式反馈
