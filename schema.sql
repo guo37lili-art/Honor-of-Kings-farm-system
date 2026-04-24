@@ -14,8 +14,12 @@ create extension if not exists pgcrypto with schema extensions;
 create table if not exists public.users (
   nickname    text primary key,
   pin_hash    text not null,       -- bcrypt hash，由 extensions.crypt() 生成
+  banned      boolean not null default false,   -- 管理员封号用，被封后无法登录
   created_at  timestamptz default now()
 );
+
+-- 兼容旧库：确保 banned 列存在
+alter table public.users add column if not exists banned boolean not null default false;
 
 create table if not exists public.crops (
   id              uuid primary key default gen_random_uuid(),
@@ -63,6 +67,7 @@ set search_path = public, extensions
 as $fn$
 declare
   v_stored text;
+  v_banned boolean;
   v_new    text;
 begin
   -- 输入校验
@@ -73,8 +78,8 @@ begin
     return null;
   end if;
 
-  -- 查现有 hash（用表别名 + 完全限定列名避免命名冲突）
-  select u.pin_hash into v_stored
+  -- 查现有 hash + banned 状态
+  select u.pin_hash, u.banned into v_stored, v_banned
   from public.users u
   where u.nickname = p_nickname;
 
@@ -83,6 +88,11 @@ begin
     v_new := extensions.crypt(p_pin, extensions.gen_salt('bf', 10));
     insert into public.users(nickname, pin_hash) values (p_nickname, v_new);
     return v_new;
+  end if;
+
+  -- 被封用户无法登录
+  if coalesce(v_banned, false) then
+    return null;
   end if;
 
   -- 已有用户校验 PIN
@@ -394,3 +404,120 @@ create policy "public read questions" on public.collection_questions for select 
 
 grant select on public.collection_questions to anon;
 revoke insert, update, delete on public.collection_questions from anon;
+
+-- ============================================================
+-- 11. 管理员能力（Admin power-ups）
+-- 允许管理员昵称（'长缨'）跨用户删作物 / 改收藏 / 切公开 / 封号
+-- 管理员身份 = nickname 等于硬编码值 + pin_hash 匹配 + 未被封
+-- ============================================================
+
+-- 11.1 管理员身份校验 helper
+create or replace function public.is_admin(p_nickname text, p_pin_hash text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, extensions
+as $fn$
+declare
+  v_ok boolean;
+begin
+  -- 管理员昵称硬编码（和 admin.html 的 ADMIN_NICKNAME 对应；改这里 + admin.html 两处可换管理员）
+  if p_nickname != '长缨' then
+    return false;
+  end if;
+  select (u.pin_hash = p_pin_hash and not coalesce(u.banned, false)) into v_ok
+  from public.users u where u.nickname = p_nickname;
+  return coalesce(v_ok, false);
+end
+$fn$;
+
+grant execute on function public.is_admin(text, text) to anon;
+
+-- 11.2 管理员删任意作物（跨用户）
+create or replace function public.admin_crop_delete(
+  p_admin_nickname text,
+  p_admin_pin_hash text,
+  p_crop_id        uuid
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $fn$
+begin
+  if not public.is_admin(p_admin_nickname, p_admin_pin_hash) then
+    return jsonb_build_object('error', 'not_admin');
+  end if;
+  delete from public.crops where id = p_crop_id;
+  return jsonb_build_object('ok', true);
+end
+$fn$;
+
+grant execute on function public.admin_crop_delete(text, text, uuid) to anon;
+
+-- 11.3 管理员改 / 删任意 collection（update 支持所有字段含 is_public；delete 硬删）
+create or replace function public.admin_collection_write(
+  p_admin_nickname text,
+  p_admin_pin_hash text,
+  p_action         text,
+  p_row_id         uuid,
+  p_payload        jsonb
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $fn$
+declare
+  v_new_row public.collections;
+begin
+  if not public.is_admin(p_admin_nickname, p_admin_pin_hash) then
+    return jsonb_build_object('error', 'not_admin');
+  end if;
+
+  if p_action = 'update' then
+    update public.collections
+    set crop_name = case when p_payload ? 'crop_name' then nullif(p_payload->>'crop_name', '') else crop_name end,
+        mutations = case when p_payload ? 'mutations' then coalesce(p_payload->'mutations', mutations) else mutations end,
+        note      = case when p_payload ? 'note' then nullif(p_payload->>'note', '') else note end,
+        image_url = case when p_payload ? 'image_url' then nullif(p_payload->>'image_url', '') else image_url end,
+        is_public = case when p_payload ? 'is_public' then coalesce((p_payload->>'is_public')::boolean, is_public) else is_public end
+    where id = p_row_id
+    returning * into v_new_row;
+    return to_jsonb(v_new_row);
+
+  elsif p_action = 'delete' then
+    delete from public.collections where id = p_row_id;
+    return jsonb_build_object('ok', true);
+
+  else
+    return jsonb_build_object('error', 'unknown_action');
+  end if;
+end
+$fn$;
+
+grant execute on function public.admin_collection_write(text, text, text, uuid, jsonb) to anon;
+
+-- 11.4 管理员封号 / 恢复（切换 users.banned）
+create or replace function public.admin_user_ban(
+  p_admin_nickname  text,
+  p_admin_pin_hash  text,
+  p_target_nickname text,
+  p_banned          boolean
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, extensions
+as $fn$
+begin
+  if not public.is_admin(p_admin_nickname, p_admin_pin_hash) then
+    return jsonb_build_object('error', 'not_admin');
+  end if;
+  -- 管理员自己不能被封（防止误操作把自己锁出去）
+  if p_target_nickname = '长缨' then
+    return jsonb_build_object('error', 'cannot_ban_admin');
+  end if;
+  update public.users set banned = coalesce(p_banned, false) where nickname = p_target_nickname;
+  return jsonb_build_object('ok', true);
+end
+$fn$;
+
+grant execute on function public.admin_user_ban(text, text, text, boolean) to anon;

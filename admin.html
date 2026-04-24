@@ -7,6 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./common.js?v=7"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <style>[x-cloak]{display:none!important}</style>
 </head>
@@ -56,79 +57,254 @@
           <div class="text-xs text-slate-500">🌱 作物总数</div>
         </div>
         <div>
-          <div class="text-2xl font-bold text-emerald-600" x-text="activeCrops.length"></div>
-          <div class="text-xs text-slate-500">💚 活动中</div>
+          <div class="text-2xl font-bold text-amber-600" x-text="collections.length"></div>
+          <div class="text-xs text-slate-500">🏆 纪念册</div>
         </div>
         <div>
-          <div class="text-2xl font-bold text-amber-600" x-text="matureCrops.length"></div>
-          <div class="text-xs text-slate-500">🌾 待收获</div>
+          <div class="text-2xl font-bold text-sky-600" x-text="publicCollections.length"></div>
+          <div class="text-xs text-slate-500">👥 朋友圈</div>
         </div>
       </div>
 
-      <!-- 筛选 -->
+      <!-- Tab 切换 -->
       <div class="flex items-center gap-2 text-sm">
-        <span class="text-slate-500">筛选：</span>
-        <button @click="filter='all'"
-          :class="filter==='all' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'"
-          class="px-3 py-1 rounded-full shadow-sm">全部</button>
-        <button @click="filter='active'"
-          :class="filter==='active' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600'"
-          class="px-3 py-1 rounded-full shadow-sm">活动中</button>
-        <button @click="filter='mature'"
-          :class="filter==='mature' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
-          class="px-3 py-1 rounded-full shadow-sm">待收获</button>
-        <button @click="filter='harvested'"
-          :class="filter==='harvested' ? 'bg-slate-500 text-white' : 'bg-white text-slate-600'"
-          class="px-3 py-1 rounded-full shadow-sm">已收获</button>
+        <button @click="tab='crops'"
+          :class="tab==='crops' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'"
+          class="px-4 py-1.5 rounded-full shadow-sm font-semibold">🌱 作物</button>
+        <button @click="tab='collections'"
+          :class="tab==='collections' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
+          class="px-4 py-1.5 rounded-full shadow-sm font-semibold">🏆 纪念册</button>
+        <button @click="tab='feed'"
+          :class="tab==='feed' ? 'bg-sky-600 text-white' : 'bg-white text-slate-600'"
+          class="px-4 py-1.5 rounded-full shadow-sm font-semibold">👥 朋友圈</button>
       </div>
 
-      <!-- 按用户分组 -->
-      <template x-for="u in usersSorted" :key="u.nickname">
-        <div class="bg-white rounded-xl shadow">
-          <div class="px-4 py-3 border-b flex items-center justify-between">
-            <div>
-              <span class="font-bold" x-text="u.nickname"></span>
-              <span class="text-xs text-slate-500 ml-2" x-text="'注册于 ' + formatDateTime(u.created_at)"></span>
-            </div>
-            <div class="text-xs text-slate-500">
-              <span x-text="cropCountFor(u.nickname, 'active') + ' 活动 · '"></span>
-              <span x-text="cropCountFor(u.nickname, 'mature') + ' 待收 · '"></span>
-              <span x-text="cropCountFor(u.nickname, 'harvested') + ' 已收'"></span>
-            </div>
+      <!-- ============ TAB: 作物 ============ -->
+      <template x-if="tab === 'crops'">
+        <div class="space-y-4">
+          <!-- 作物筛选 -->
+          <div class="flex items-center gap-2 text-sm">
+            <span class="text-slate-500">筛选：</span>
+            <button @click="cropFilter='all'"
+              :class="cropFilter==='all' ? 'bg-slate-800 text-white' : 'bg-white text-slate-600'"
+              class="px-3 py-1 rounded-full shadow-sm">全部</button>
+            <button @click="cropFilter='active'"
+              :class="cropFilter==='active' ? 'bg-emerald-600 text-white' : 'bg-white text-slate-600'"
+              class="px-3 py-1 rounded-full shadow-sm">活动中</button>
+            <button @click="cropFilter='mature'"
+              :class="cropFilter==='mature' ? 'bg-amber-600 text-white' : 'bg-white text-slate-600'"
+              class="px-3 py-1 rounded-full shadow-sm">待收获</button>
+            <button @click="cropFilter='harvested'"
+              :class="cropFilter==='harvested' ? 'bg-slate-500 text-white' : 'bg-white text-slate-600'"
+              class="px-3 py-1 rounded-full shadow-sm">已收获</button>
           </div>
-          <div class="divide-y">
-            <template x-for="c in filteredCropsFor(u.nickname)" :key="c.id">
-              <div class="px-4 py-2.5 text-sm flex items-center gap-3">
-                <span class="text-xl" x-text="{8:'🌾',16:'🌽',32:'🫐'}[c.type]"></span>
-                <div class="flex-1 min-w-0">
-                  <div class="font-medium">
-                    <span x-text="c.type + 'h'"></span>
-                    <span class="ml-2 text-xs px-1.5 py-0.5 rounded"
-                      :class="cropBadgeClass(c)" x-text="cropStatusLabel(c)"></span>
-                  </div>
-                  <div class="text-xs text-slate-500 mt-0.5">
-                    种于 <span x-text="formatDateTime(c.planted_at)"></span>
-                    · 已浇 <span x-text="(c.water_events||[]).length"></span> 次
-                    <template x-if="!c.harvested_at">
-                      <span>· 预计 <span x-text="formatDateTime(computeMatTime(c))"></span></span>
-                    </template>
-                    <template x-if="c.harvested_at">
-                      <span>· 收于 <span x-text="formatDateTime(c.harvested_at)"></span></span>
-                    </template>
-                  </div>
+
+          <template x-for="u in usersSorted" :key="u.nickname">
+            <div class="bg-white rounded-xl shadow">
+              <div class="px-4 py-3 border-b flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span class="font-bold" x-text="u.nickname"></span>
+                  <template x-if="u.banned">
+                    <span class="ml-2 text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">已封</span>
+                  </template>
+                  <span class="text-xs text-slate-500 ml-2" x-text="'注册于 ' + formatDateTime(u.created_at)"></span>
+                </div>
+                <div class="flex items-center gap-3 text-xs">
+                  <span class="text-slate-500">
+                    <span x-text="cropCountFor(u.nickname, 'active') + ' 活动 · '"></span>
+                    <span x-text="cropCountFor(u.nickname, 'mature') + ' 待收 · '"></span>
+                    <span x-text="cropCountFor(u.nickname, 'harvested') + ' 已收'"></span>
+                  </span>
+                  <!-- 管理员自己不显示封号按钮 -->
+                  <template x-if="u.nickname !== ADMIN_NICKNAME">
+                    <button @click="askBan(u)"
+                      :class="u.banned ? 'text-emerald-600 hover:text-emerald-700' : 'text-red-500 hover:text-red-700'"
+                      x-text="u.banned ? '🔓 解封' : '🚫 封号'"
+                      class="font-semibold"></button>
+                  </template>
                 </div>
               </div>
-            </template>
-            <template x-if="filteredCropsFor(u.nickname).length === 0">
-              <div class="px-4 py-6 text-center text-sm text-slate-400">无符合筛选的作物</div>
-            </template>
-          </div>
+              <div class="divide-y">
+                <template x-for="c in filteredCropsFor(u.nickname)" :key="c.id">
+                  <div class="px-4 py-2.5 text-sm flex items-center gap-3">
+                    <span class="text-xl" x-text="{8:'🌾',16:'🌽',32:'🫐'}[c.type]"></span>
+                    <div class="flex-1 min-w-0">
+                      <div class="font-medium">
+                        <span x-text="c.type + 'h'"></span>
+                        <template x-if="c.name">
+                          <span class="ml-1" x-text="'· ' + c.name"></span>
+                        </template>
+                        <span class="ml-2 text-xs px-1.5 py-0.5 rounded"
+                          :class="cropBadgeClass(c)" x-text="cropStatusLabel(c)"></span>
+                      </div>
+                      <div class="text-xs text-slate-500 mt-0.5">
+                        种于 <span x-text="formatDateTime(c.planted_at)"></span>
+                        · 已浇 <span x-text="(c.water_events||[]).length"></span> 次
+                        <template x-if="!c.harvested_at">
+                          <span>· 预计 <span x-text="formatDateTime(computeMatTime(c))"></span></span>
+                        </template>
+                        <template x-if="c.harvested_at">
+                          <span>· 收于 <span x-text="formatDateTime(c.harvested_at)"></span></span>
+                        </template>
+                      </div>
+                    </div>
+                    <button @click="askDelete({type:'crop', id:c.id, desc:c.type+'h · '+(c.name||'无名')+' · '+u.nickname})"
+                      class="text-red-400 hover:text-red-600 text-xs font-semibold">🗑️ 删除</button>
+                  </div>
+                </template>
+                <template x-if="filteredCropsFor(u.nickname).length === 0">
+                  <div class="px-4 py-6 text-center text-sm text-slate-400">无符合筛选的作物</div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <template x-if="users.length === 0">
+            <div class="text-center text-slate-400 py-12">还没有任何用户</div>
+          </template>
         </div>
       </template>
 
-      <template x-if="users.length === 0">
-        <div class="text-center text-slate-400 py-12">
-          还没有任何用户
+      <!-- ============ TAB: 纪念册（全部条目，含非公开）============ -->
+      <template x-if="tab === 'collections'">
+        <div class="space-y-4">
+          <div class="text-xs text-slate-500">管理员视图：看得到所有用户的纪念册，**包括非公开**条目</div>
+
+          <template x-for="u in usersWithCollections" :key="u.nickname">
+            <div class="bg-white rounded-xl shadow">
+              <div class="px-4 py-3 border-b flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <span class="font-bold" x-text="u.nickname"></span>
+                  <template x-if="u.banned">
+                    <span class="ml-2 text-xs px-2 py-0.5 rounded bg-red-100 text-red-700">已封</span>
+                  </template>
+                  <span class="text-xs text-slate-500 ml-2">
+                    共 <span x-text="collectionsFor(u.nickname).length"></span> 条 ·
+                    其中 <span x-text="collectionsFor(u.nickname).filter(c=>c.is_public).length"></span> 公开
+                  </span>
+                </div>
+              </div>
+              <div class="divide-y">
+                <template x-for="c in collectionsFor(u.nickname)" :key="c.id">
+                  <div class="p-4">
+                    <div class="flex items-start gap-3">
+                      <span class="text-2xl" x-text="{8:'🌾',16:'🌽',32:'🫐'}[c.crop_type]"></span>
+                      <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2 flex-wrap">
+                          <span class="font-semibold" x-text="c.crop_name || '作物'"
+                            :class="topMutationTextClass(c.mutations)"></span>
+                          <span class="font-bold text-sm"
+                            :class="topMutationTextClass(c.mutations) || 'text-slate-500'"
+                            x-text="totalMultiplier(c.mutations) + '×'"></span>
+                          <template x-if="c.is_public">
+                            <span class="text-[11px] px-2 py-0.5 rounded-full bg-sky-100 text-sky-700">👥 公开</span>
+                          </template>
+                          <template x-if="!c.is_public">
+                            <span class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">🔒 私密</span>
+                          </template>
+                          <span class="text-[11px] text-slate-400 ml-auto" x-text="formatDateTime(c.created_at)"></span>
+                        </div>
+                        <div class="flex flex-wrap gap-1 mt-1">
+                          <template x-for="m in sortedMutations(c.mutations)" :key="m.type + (m.name || '')">
+                            <span class="text-[11px] px-2 py-0.5 rounded-full"
+                              :class="mutationBadgeClass(m)"
+                              x-text="mutationBadgeLabel(m)"></span>
+                          </template>
+                          <template x-if="!c.mutations || c.mutations.length === 0">
+                            <span class="text-[11px] text-slate-400">无变异</span>
+                          </template>
+                        </div>
+                        <template x-if="c.note">
+                          <div class="text-sm text-slate-600 italic mt-1 break-words" x-text="'&quot;' + c.note + '&quot;'"></div>
+                        </template>
+                        <template x-if="c.image_url">
+                          <img :src="c.image_url" @click="lightboxUrl = c.image_url"
+                            class="w-full max-h-64 object-cover rounded mt-2 cursor-zoom-in" />
+                        </template>
+                      </div>
+                    </div>
+                    <!-- 操作按钮 -->
+                    <div class="flex items-center gap-3 mt-3 text-xs justify-end">
+                      <button @click="openEdit(c)"
+                        class="text-sky-600 hover:text-sky-700 font-semibold">✏️ 编辑</button>
+                      <button @click="togglePublic(c)"
+                        class="text-amber-600 hover:text-amber-700 font-semibold"
+                        x-text="c.is_public ? '🔒 改为私密' : '👥 公开'"></button>
+                      <button @click="askDelete({type:'collection', id:c.id, desc:'收藏 · '+(c.crop_name||'作物')+' · '+u.nickname})"
+                        class="text-red-500 hover:text-red-700 font-semibold">🗑️ 删除</button>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="collectionsFor(u.nickname).length === 0">
+                  <div class="px-4 py-6 text-center text-sm text-slate-400">该用户无纪念册</div>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <template x-if="usersWithCollections.length === 0">
+            <div class="text-center text-slate-400 py-12">还没有任何纪念册</div>
+          </template>
+        </div>
+      </template>
+
+      <!-- ============ TAB: 朋友圈（仅 is_public=true）============ -->
+      <template x-if="tab === 'feed'">
+        <div class="space-y-3">
+          <div class="text-xs text-slate-500">管理员视图：朋友圈 = 已公开的纪念册条目。点"改为私密"等于把该条从朋友圈移除（玩家账号里仍能看到）</div>
+
+          <template x-for="c in feedCollections" :key="c.id">
+            <div class="bg-white rounded-xl shadow p-4 space-y-2">
+              <div class="flex items-start gap-3">
+                <span class="text-2xl" x-text="{8:'🌾',16:'🌽',32:'🫐'}[c.crop_type]"></span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-sm" x-text="c.user_nickname"></span>
+                    <span class="text-slate-400">·</span>
+                    <span class="font-semibold" :class="topMutationTextClass(c.mutations)"
+                      x-text="c.crop_name || '作物'"></span>
+                    <span class="font-bold text-sm"
+                      :class="topMutationTextClass(c.mutations) || 'text-slate-500'"
+                      x-text="totalMultiplier(c.mutations) + '×'"></span>
+                    <span class="text-[11px] text-slate-400 ml-auto" x-text="formatDateTime(c.created_at)"></span>
+                  </div>
+                  <div class="flex flex-wrap gap-1 mt-1">
+                    <template x-for="m in sortedMutations(c.mutations)" :key="m.type + (m.name || '')">
+                      <span class="text-[11px] px-2 py-0.5 rounded-full"
+                        :class="mutationBadgeClass(m)"
+                        x-text="mutationBadgeLabel(m)"></span>
+                    </template>
+                    <template x-if="!c.mutations || c.mutations.length === 0">
+                      <span class="text-[11px] text-slate-400">无变异</span>
+                    </template>
+                  </div>
+                  <template x-if="c.note">
+                    <div class="text-sm text-slate-600 italic mt-1 break-words" x-text="'&quot;' + c.note + '&quot;'"></div>
+                  </template>
+                  <template x-if="c.image_url">
+                    <img :src="c.image_url" @click="lightboxUrl = c.image_url"
+                      class="w-full max-h-64 object-cover rounded mt-2 cursor-zoom-in" />
+                  </template>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 text-xs justify-end pt-2 border-t">
+                <span class="text-slate-400">
+                  ❤️ <span x-text="likeCountFor(c.id)"></span>
+                  · ❓ <span x-text="questionCountFor(c.id)"></span>
+                </span>
+                <button @click="openEdit(c)"
+                  class="text-sky-600 hover:text-sky-700 font-semibold">✏️ 编辑</button>
+                <button @click="togglePublic(c)"
+                  class="text-amber-600 hover:text-amber-700 font-semibold">🔒 改为私密</button>
+                <button @click="askDelete({type:'collection', id:c.id, desc:'收藏 · '+(c.crop_name||'作物')+' · '+c.user_nickname})"
+                  class="text-red-500 hover:text-red-700 font-semibold">🗑️ 删除</button>
+              </div>
+            </div>
+          </template>
+
+          <template x-if="feedCollections.length === 0">
+            <div class="text-center text-slate-400 py-12">朋友圈空空如也</div>
+          </template>
         </div>
       </template>
 
@@ -138,17 +314,125 @@
     </div>
   </template>
 
+  <!-- ============ 编辑 Modal（纪念册编辑）============ -->
+  <template x-if="editingCollection">
+    <div class="fixed inset-0 bg-black/50 z-40 flex items-end md:items-center justify-center p-4"
+         @click="editingCollection = null">
+      <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-5 space-y-3 max-h-[90vh] overflow-y-auto"
+           @click.stop>
+        <h3 class="font-bold text-lg">✏️ 编辑纪念册 · <span x-text="editingCollection.user_nickname" class="text-slate-500 text-sm font-normal"></span></h3>
+        <div class="space-y-2 text-sm">
+          <label class="block">
+            <span class="text-slate-600">作物名</span>
+            <input x-model="editForm.crop_name" maxlength="50"
+              class="w-full border rounded px-3 py-2 mt-1" />
+          </label>
+          <div>
+            <span class="text-slate-600 text-sm">变异（最多 3 种）</span>
+            <div class="flex flex-wrap gap-2 mt-1">
+              <template x-for="type in ['hero','giant','purple','normal']" :key="type">
+                <button @click="toggleMutation(type)"
+                  :class="hasMutation(type) ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'"
+                  class="px-3 py-1 rounded-full text-xs"
+                  x-text="MUTATION_TYPES[type].label + ' ' + MUTATION_TYPES[type].multiplier + '×'"></button>
+              </template>
+            </div>
+            <template x-if="hasMutation('purple')">
+              <div class="flex flex-wrap gap-1 mt-2">
+                <template x-for="sub in MUTATION_TYPES.purple.subnames" :key="sub">
+                  <button @click="setPurpleSub(sub)"
+                    :class="purpleSubname() === sub ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700'"
+                    class="px-2 py-0.5 rounded text-[11px]"
+                    x-text="sub"></button>
+                </template>
+              </div>
+            </template>
+          </div>
+          <label class="block">
+            <span class="text-slate-600">备注</span>
+            <textarea x-model="editForm.note" rows="2" maxlength="500"
+              class="w-full border rounded px-3 py-2 mt-1"></textarea>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" x-model="editForm.is_public" />
+            <span class="text-slate-600">公开到朋友圈</span>
+          </label>
+        </div>
+        <div class="flex gap-2 justify-end pt-2">
+          <button @click="editingCollection = null"
+            class="px-4 py-2 rounded bg-slate-100 text-slate-600 text-sm">取消</button>
+          <button @click="submitEdit()" :disabled="editLoading"
+            class="px-4 py-2 rounded bg-sky-600 text-white text-sm font-semibold disabled:opacity-50"
+            x-text="editLoading ? '保存中…' : '保存'"></button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============ 删除确认 Modal ============ -->
+  <template x-if="deleteTarget">
+    <div class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+         @click="deleteTarget = null">
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3" @click.stop>
+        <h3 class="font-bold text-lg text-red-600">🗑️ 确认删除</h3>
+        <div class="text-sm text-slate-700">确定要删除以下<span x-text="deleteTarget.type === 'crop' ? '作物' : '收藏'"></span>？</div>
+        <div class="text-xs text-slate-500 bg-slate-50 rounded px-3 py-2" x-text="deleteTarget.desc"></div>
+        <div class="text-xs text-red-500">❗ 此操作不可撤销</div>
+        <div class="flex gap-2 justify-end pt-2">
+          <button @click="deleteTarget = null"
+            class="px-4 py-2 rounded bg-slate-100 text-slate-600 text-sm">取消</button>
+          <button @click="confirmDelete()" :disabled="deleteLoading"
+            class="px-4 py-2 rounded bg-red-600 text-white text-sm font-semibold disabled:opacity-50"
+            x-text="deleteLoading ? '删除中…' : '确认删除'"></button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============ 封号/解封 Modal ============ -->
+  <template x-if="banTarget">
+    <div class="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4"
+         @click="banTarget = null">
+      <div class="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-3" @click.stop>
+        <h3 class="font-bold text-lg" :class="banTarget.banned ? 'text-emerald-600' : 'text-red-600'"
+          x-text="banTarget.banned ? '🔓 确认解封' : '🚫 确认封号'"></h3>
+        <div class="text-sm text-slate-700">
+          <span x-text="banTarget.banned ? '解封用户：' : '封号用户：'"></span>
+          <b x-text="banTarget.nickname"></b>
+        </div>
+        <div class="text-xs text-slate-500" x-show="!banTarget.banned">
+          封号后该用户无法登录，已有作物和纪念册数据保留
+        </div>
+        <div class="flex gap-2 justify-end pt-2">
+          <button @click="banTarget = null"
+            class="px-4 py-2 rounded bg-slate-100 text-slate-600 text-sm">取消</button>
+          <button @click="confirmBan()" :disabled="banLoading"
+            :class="banTarget.banned ? 'bg-emerald-600' : 'bg-red-600'"
+            class="px-4 py-2 rounded text-white text-sm font-semibold disabled:opacity-50"
+            x-text="banLoading ? '处理中…' : (banTarget.banned ? '解封' : '封号')"></button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- ============ 图片 Lightbox ============ -->
+  <template x-if="lightboxUrl">
+    <div class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 cursor-zoom-out"
+         @click="lightboxUrl = null">
+      <img :src="lightboxUrl" class="max-w-full max-h-full object-contain" />
+    </div>
+  </template>
+
+  <!-- Toast -->
+  <template x-if="toast">
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-800 text-white rounded-full px-4 py-2 text-sm shadow-lg z-50"
+         x-text="toast"></div>
+  </template>
+
 </div>
 
 <script>
-// Supabase 配置（与 index.html 保持一致）
-const SUPABASE_URL = 'https://eebimxoefmibbxxtmebp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVlYmlteG9lZm1pYmJ4eHRtZWJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY2NDIzNzQsImV4cCI6MjA5MjIxODM3NH0.zfHwvQ_o17Q10ZovGdWy9uNzhL_FsD463rUnDpNN180';
-const ADMIN_NICKNAME = '长缨';  // 管理员昵称（硬编码，改这里就能换管理员）
-
-let sbClient = null;
-
-const HOUR_MS = 3600 * 1000;
+const ADMIN_NICKNAME = '长缨';  // 和 schema.sql is_admin() 内的硬编码对应
 
 // SYNC-LITE: 这是 index.html computeMatTime 的"简化版"——少了 d 的 max(0,...) 和 reduction 的 min(_, T) 两处 clamp
 // 仅用于后台粗略展示成熟时间。如果某天后台需要精确显示，请同步对齐 index.html 的完整版
@@ -166,35 +450,60 @@ function computeMatTime(crop) {
   return planted + T - reduction;
 }
 
-function formatDateTime(ts) {
-  if (!ts) return '--';
-  const d = new Date(ts);
-  const now = new Date();
-  const opts = { hour: '2-digit', minute: '2-digit' };
-  const sameDay = d.toDateString() === now.toDateString();
-  const tomorrow = new Date(now.getTime() + 86400000).toDateString() === d.toDateString();
-  if (sameDay) return '今 ' + d.toLocaleTimeString('zh-CN', opts);
-  if (tomorrow) return '明 ' + d.toLocaleTimeString('zh-CN', opts);
-  return d.toLocaleDateString('zh-CN', {month:'2-digit',day:'2-digit'}) + ' ' + d.toLocaleTimeString('zh-CN', opts);
-}
-
 function admin() {
   return {
     authed: false,
     loading: false,
     loginForm: { nickname: '', pin: '' },
     loginErr: '',
+    me: null,                 // 管理员登录后存 { nickname, pin_hash }，给 admin RPC 用
+
+    tab: 'crops',             // 'crops' | 'collections' | 'feed'
+    cropFilter: 'all',
     users: [],
     crops: [],
-    filter: 'all',
+    collections: [],
+    likes: [],
+    questions: [],
     lastLoadAt: null,
 
+    // 编辑 collection 状态
+    editingCollection: null,  // 当前正在编辑的条目
+    editForm: { crop_name: '', mutations: [], note: '', is_public: false },
+    editLoading: false,
+
+    // 删除确认
+    deleteTarget: null,       // { type, id, desc }
+    deleteLoading: false,
+
+    // 封号确认
+    banTarget: null,          // { nickname, banned }（banned = 当前状态，true 表示已封想解封）
+    banLoading: false,
+
+    // 图片预览
+    lightboxUrl: null,
+
+    // Toast
+    toast: '',
+
+    // 常量暴露给模板
+    ADMIN_NICKNAME,
+    MUTATION_TYPES,
+
     init() {
-      sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const saved = localStorage.getItem('wz_admin_authed');
-      if (saved === ADMIN_NICKNAME) {
-        this.authed = true;
-        this.loadAll();
+      if (!initSbClient()) {
+        alert('Supabase 库没加载成功');
+        return;
+      }
+      const saved = localStorage.getItem('wz_admin_me');
+      if (saved) {
+        try {
+          this.me = JSON.parse(saved);
+          if (this.me && this.me.nickname === ADMIN_NICKNAME) {
+            this.authed = true;
+            this.loadAll();
+          }
+        } catch {}
       }
     },
 
@@ -217,11 +526,12 @@ function admin() {
         });
         if (error) throw error;
         if (!data || typeof data !== 'string') {
-          this.loginErr = '登录失败';
+          this.loginErr = 'PIN 错误或已被封';
           return;
         }
+        this.me = { nickname: nick, pin_hash: data };
+        localStorage.setItem('wz_admin_me', JSON.stringify(this.me));
         this.authed = true;
-        localStorage.setItem('wz_admin_authed', ADMIN_NICKNAME);
         await this.loadAll();
       } catch (e) {
         this.loginErr = '错误：' + (e.message || e);
@@ -231,31 +541,55 @@ function admin() {
     },
 
     logout() {
-      localStorage.removeItem('wz_admin_authed');
+      localStorage.removeItem('wz_admin_me');
       this.authed = false;
+      this.me = null;
       this.users = [];
       this.crops = [];
+      this.collections = [];
+      this.likes = [];
+      this.questions = [];
     },
 
     async loadAll() {
-      const [usersRes, cropsRes] = await Promise.all([
-        sbClient.from('users').select('nickname, created_at').order('created_at', { ascending: false }),
+      const [usersRes, cropsRes, collsRes, likesRes, qsRes] = await Promise.all([
+        sbClient.from('users').select('nickname, created_at, banned').order('created_at', { ascending: false }),
         sbClient.from('crops').select('*').order('planted_at', { ascending: false }),
+        sbClient.from('collections').select('*').order('created_at', { ascending: false }),
+        sbClient.from('collection_likes').select('collection_id, user_nickname'),
+        sbClient.from('collection_questions').select('collection_id, user_nickname'),
       ]);
       this.users = usersRes.data || [];
       this.crops = cropsRes.data || [];
+      this.collections = collsRes.data || [];
+      this.likes = likesRes.data || [];
+      this.questions = qsRes.data || [];
       this.lastLoadAt = Date.now();
     },
 
-    // 派生：按 nickname 排序（有活动作物的优先）
+    // ========== 排序 / 派生 ==========
+
     get usersSorted() {
-      const now = Date.now();
       return [...this.users].sort((a, b) => {
         const aActive = this.crops.filter(c => c.user_nickname === a.nickname && !c.harvested_at).length;
         const bActive = this.crops.filter(c => c.user_nickname === b.nickname && !c.harvested_at).length;
         if (aActive !== bActive) return bActive - aActive;
         return new Date(b.created_at) - new Date(a.created_at);
       });
+    },
+
+    get usersWithCollections() {
+      // 纪念册 tab：只显示有 collection 的用户（无的不占空间）
+      const hasColl = new Set(this.collections.map(c => c.user_nickname));
+      return this.usersSorted.filter(u => hasColl.has(u.nickname));
+    },
+
+    get publicCollections() {
+      return this.collections.filter(c => c.is_public);
+    },
+    get feedCollections() {
+      // 朋友圈 tab：is_public=true，按 created_at desc（loadAll 已 desc，filter 保序）
+      return this.publicCollections;
     },
 
     get activeCrops() {
@@ -280,10 +614,21 @@ function admin() {
     filteredCropsFor(nickname) {
       const now = Date.now();
       let pool = this.crops.filter(c => c.user_nickname === nickname);
-      if (this.filter === 'active') pool = pool.filter(c => !c.harvested_at && computeMatTime(c) > now);
-      if (this.filter === 'mature') pool = pool.filter(c => !c.harvested_at && computeMatTime(c) <= now);
-      if (this.filter === 'harvested') pool = pool.filter(c => c.harvested_at);
+      if (this.cropFilter === 'active') pool = pool.filter(c => !c.harvested_at && computeMatTime(c) > now);
+      if (this.cropFilter === 'mature') pool = pool.filter(c => !c.harvested_at && computeMatTime(c) <= now);
+      if (this.cropFilter === 'harvested') pool = pool.filter(c => c.harvested_at);
       return pool;
+    },
+
+    collectionsFor(nickname) {
+      return this.collections.filter(c => c.user_nickname === nickname);
+    },
+
+    likeCountFor(collectionId) {
+      return this.likes.filter(l => l.collection_id === collectionId).length;
+    },
+    questionCountFor(collectionId) {
+      return this.questions.filter(q => q.collection_id === collectionId).length;
     },
 
     cropStatusLabel(c) {
@@ -301,7 +646,186 @@ function admin() {
       return 'bg-emerald-100 text-emerald-700';
     },
 
+    mutationBadgeClass(m) {
+      return MUTATION_TYPES[m.type]?.badgeClass || '';
+    },
+
+    // ========== 编辑 collection ==========
+
+    openEdit(c) {
+      this.editingCollection = c;
+      this.editForm = {
+        crop_name: c.crop_name || '',
+        mutations: JSON.parse(JSON.stringify(c.mutations || [])),
+        note: c.note || '',
+        is_public: !!c.is_public,
+      };
+    },
+
+    hasMutation(type) {
+      return this.editForm.mutations.some(m => m.type === type);
+    },
+    purpleSubname() {
+      const p = this.editForm.mutations.find(m => m.type === 'purple');
+      return p ? (p.name || '') : '';
+    },
+    toggleMutation(type) {
+      const has = this.hasMutation(type);
+      if (has) {
+        this.editForm.mutations = this.editForm.mutations.filter(m => m.type !== type);
+      } else {
+        if (this.editForm.mutations.length >= 3) {
+          this.showToast('最多 3 种变异');
+          return;
+        }
+        if (type === 'purple') {
+          this.editForm.mutations.push({ type: 'purple', name: MUTATION_TYPES.purple.subnames[0] });
+        } else {
+          this.editForm.mutations.push({ type });
+        }
+      }
+    },
+    setPurpleSub(sub) {
+      this.editForm.mutations = this.editForm.mutations.map(m =>
+        m.type === 'purple' ? { ...m, name: sub } : m
+      );
+    },
+
+    async submitEdit() {
+      if (!this.editingCollection || this.editLoading) return;
+      this.editLoading = true;
+      try {
+        const { data, error } = await sbClient.rpc('admin_collection_write', {
+          p_admin_nickname: this.me.nickname,
+          p_admin_pin_hash: this.me.pin_hash,
+          p_action: 'update',
+          p_row_id: this.editingCollection.id,
+          p_payload: {
+            crop_name: (this.editForm.crop_name || '').trim(),
+            mutations: this.editForm.mutations,
+            note: (this.editForm.note || '').trim(),
+            is_public: this.editForm.is_public,
+          },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast('✅ 已保存');
+        this.editingCollection = null;
+        await this.loadAll();
+      } catch (e) {
+        alert('保存失败：' + (e.message || e));
+      } finally {
+        this.editLoading = false;
+      }
+    },
+
+    // ========== 切换公开 / 私密 ==========
+
+    async togglePublic(c) {
+      try {
+        const { data, error } = await sbClient.rpc('admin_collection_write', {
+          p_admin_nickname: this.me.nickname,
+          p_admin_pin_hash: this.me.pin_hash,
+          p_action: 'update',
+          p_row_id: c.id,
+          p_payload: { is_public: !c.is_public },
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast(c.is_public ? '🔒 已改为私密' : '👥 已公开');
+        await this.loadAll();
+      } catch (e) {
+        alert('切换失败：' + (e.message || e));
+      }
+    },
+
+    // ========== 删除（作物 / 收藏 通用）==========
+
+    askDelete(target) {
+      this.deleteTarget = target;
+    },
+
+    async confirmDelete() {
+      if (!this.deleteTarget || this.deleteLoading) return;
+      this.deleteLoading = true;
+      const t = this.deleteTarget;
+      try {
+        let data, error;
+        if (t.type === 'crop') {
+          ({ data, error } = await sbClient.rpc('admin_crop_delete', {
+            p_admin_nickname: this.me.nickname,
+            p_admin_pin_hash: this.me.pin_hash,
+            p_crop_id: t.id,
+          }));
+        } else if (t.type === 'collection') {
+          // 删 collection 前先把图的 URL 留下来，删库后顺便清 Storage orphan
+          const coll = this.collections.find(c => c.id === t.id);
+          ({ data, error } = await sbClient.rpc('admin_collection_write', {
+            p_admin_nickname: this.me.nickname,
+            p_admin_pin_hash: this.me.pin_hash,
+            p_action: 'delete',
+            p_row_id: t.id,
+            p_payload: {},
+          }));
+          if (!error && !data?.error && coll && coll.image_url) {
+            // 静默清图（失败不抛）
+            await removeImageByUrl(coll.image_url);
+          }
+        }
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast('✅ 已删除');
+        this.deleteTarget = null;
+        await this.loadAll();
+      } catch (e) {
+        alert('删除失败：' + (e.message || e));
+      } finally {
+        this.deleteLoading = false;
+      }
+    },
+
+    // ========== 封号 / 解封 ==========
+
+    askBan(user) {
+      this.banTarget = { nickname: user.nickname, banned: !!user.banned };
+    },
+
+    async confirmBan() {
+      if (!this.banTarget || this.banLoading) return;
+      this.banLoading = true;
+      const targetBanned = !this.banTarget.banned;   // 切换
+      try {
+        const { data, error } = await sbClient.rpc('admin_user_ban', {
+          p_admin_nickname: this.me.nickname,
+          p_admin_pin_hash: this.me.pin_hash,
+          p_target_nickname: this.banTarget.nickname,
+          p_banned: targetBanned,
+        });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        this.showToast(targetBanned ? '🚫 已封号' : '🔓 已解封');
+        this.banTarget = null;
+        await this.loadAll();
+      } catch (e) {
+        alert('操作失败：' + (e.message || e));
+      } finally {
+        this.banLoading = false;
+      }
+    },
+
+    // ========== 杂项 ==========
+
+    showToast(msg) {
+      this.toast = msg;
+      setTimeout(() => { this.toast = ''; }, 2000);
+    },
+
+    // pass-through 给 Alpine 模板用
     formatDateTime(ts) { return formatDateTime(ts); },
+    totalMultiplier(ms) { return totalMultiplier(ms); },
+    mutationBadgeLabel(m) { return mutationBadgeLabel(m); },
+    topMutationTextClass(ms) { return topMutationTextClass(ms); },
+    sortedMutations(ms) { return sortedMutations(ms); },
   };
 }
 </script>
