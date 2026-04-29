@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 I · 软萌粘土田园 · 灵动版 v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@600;700;800;900&family=Quicksand:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* === 颜色 · pastel 5 色协调 === */
+    --paper:     #fff9f0;
+    --paper-2:   #fbf2e2;
+    --paper-3:   #f3e8d2;
+    --white:     #ffffff;
+    --strawberry:      #f5b0b0;
+    --strawberry-deep: #d97373;
+    --strawberry-soft: #fde0e0;
+    --sprout:      #b5d4a0;
+    --sprout-deep: #7fa66a;
+    --sprout-soft: #e0eed4;
+    --peach:      #ffd17a;
+    --peach-deep: #e5a040;
+    --peach-soft: #fff0d4;
+    --milk-blue:      #b5d2e8;
+    --milk-blue-deep: #6090b8;
+    --milk-blue-soft: #e0eef8;
+    --lilac:      #d4b8e8;
+    --lilac-deep: #9b7ab5;
+    --lilac-soft: #ece0f5;
+    --ink:    #4a3a30;
+    --ink-2:  #7a6a5c;
+    --ink-3:  #b0a094;
+    --hairline: #ebe0cc;
+
+    /* === 间距 8 级 === */
+    --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+    --s5: 20px; --s6: 24px; --s7: 28px; --s8: 32px;
+
+    /* === 字号 === */
+    --t-xs: 10px; --t-sm: 11px; --t-md: 12px; --t-base: 13px;
+    --t-lg: 15px; --t-xl: 18px; --t-2xl: 22px; --t-3xl: 28px; --t-4xl: 44px;
+
+    /* === 字距 === */
+    --ls-0: 0; --ls-1: 0.3px; --ls-2: 1px; --ls-3: 2px; --ls-4: 4px;
+
+    /* === 圆角(克制,不到 20px) === */
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px; --r-pill: 9999px;
+
+    /* === 字体 === */
+    --font-display: 'Fredoka', 'Quicksand', 'Noto Sans SC', sans-serif;
+    --font-sans:    'Quicksand', 'Noto Sans SC', sans-serif;
+    --font-num:     'Nunito', 'Fredoka', monospace;
+
+    /* === 柔和单层阴影(不要堆 3 层) === */
+    --shadow-soft: 0 1px 0 rgba(74, 58, 48, 0.04), 0 4px 12px -4px rgba(74, 58, 48, 0.08);
+    --shadow-pop: 0 2px 0 rgba(74, 58, 48, 0.06), 0 8px 20px -6px rgba(74, 58, 48, 0.14);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-sans);
+    font-weight: 500;
+    color: var(--ink);
+    background: #f0e3c8;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(255, 209, 122, 0.35), transparent 45%),
+      radial-gradient(circle at 85% 85%, rgba(245, 176, 176, 0.3), transparent 50%);
+    min-height: 100vh;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input { font: inherit; color: inherit; }
+
+  /* ============ Reference card ============ */
+  .ref-card {
+    background: var(--white);
+    color: var(--ink);
+    padding: var(--s5) var(--s8);
+    display: flex;
+    align-items: center;
+    gap: var(--s8);
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--hairline);
+    line-height: 1.5;
+  }
+  .ref-card h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: var(--t-lg);
+    letter-spacing: var(--ls-2);
+    line-height: 1.3;
+  }
+  .ref-card h1 .accent {
+    color: var(--strawberry-deep);
+    margin-right: 6px;
+    font-family: var(--font-num);
+    font-style: italic;
+  }
+  .ref-card .ref-sub {
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-1);
+    line-height: 1.7;
+  }
+  .ref-card b { color: var(--ink-2); font-weight: 600; }
+  .ref-swatches { display: flex; gap: var(--s1); }
+  .ref-swatches span {
+    display: block;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1px solid var(--hairline);
+  }
+
+  /* ============ Screens ============ */
+  .screens {
+    display: flex;
+    gap: var(--s8);
+    padding: var(--s8);
+    overflow-x: auto;
+    align-items: flex-start;
+  }
+  .screen {
+    flex: 0 0 375px;
+    min-height: 812px;
+    background: var(--paper);
+    border-radius: var(--s7);
+    box-shadow:
+      0 0 0 4px rgba(255, 255, 255, 0.5),
+      0 16px 48px -12px rgba(74, 58, 48, 0.2);
+    position: relative;
+    padding: var(--s7) var(--s6) 84px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .screen.no-tabbar { padding-bottom: var(--s8); }
+  .screen-label {
+    position: absolute;
+    top: var(--s3);
+    right: var(--s5);
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-1);
+    line-height: 1;
+    opacity: 0.5;
+  }
+  /* 微妙的色晕装饰 */
+  .screen::before {
+    content: '';
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 180px; height: 180px;
+    background: radial-gradient(circle, var(--peach-soft), transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .screen > * { position: relative; z-index: 1; }
+  .screen > nav.tabbar { z-index: 10; }
+
+  /* ============ TabBar ============ */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--white);
+    border-top: 1px solid var(--hairline);
+    border-radius: 0 0 var(--s7) var(--s7);
+    display: flex;
+  }
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s1);
+    font-family: var(--font-display);
+    font-size: var(--t-xs);
+    font-weight: 600;
+    color: var(--ink-3);
+    letter-spacing: var(--ls-2);
+    line-height: 1;
+    position: relative;
+  }
+  .tab-item .tab-icon-wrap {
+    position: relative;
+    width: 24px; height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tab-item .tab-icon {
+    font-size: 18px;
+    line-height: 1;
+    opacity: 0.6;
+  }
+  .tab-item.active { color: var(--strawberry-deep); font-weight: 700; }
+  .tab-item.active .tab-icon { opacity: 1; }
+  .tab-badge {
+    position: absolute;
+    top: -2px;
+    left: calc(50% + 8px);
+    min-width: 14px; height: 14px;
+    padding: 0 4px;
+    background: var(--strawberry-deep);
+    color: var(--white);
+    font-family: var(--font-num);
+    font-size: 9px;
+    border-radius: var(--r-pill);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  /* ============ Page 1 · login · 软 3D 种子吉祥物 ============ */
+  .page-login { padding: 64px var(--s7) var(--s8); }
+  .login-mascot {
+    position: relative;
+    width: 88px; height: 88px;
+    margin: 0 auto var(--s5);
+  }
+  .mascot-leaf {
+    position: absolute;
+    top: -10px; left: 50%;
+    transform: translateX(-50%) rotate(-12deg);
+    width: 22px; height: 28px;
+    background: linear-gradient(160deg, var(--sprout) 0%, var(--sprout-deep) 100%);
+    border-radius: 0 100% 0 100%;
+    z-index: 2;
+  }
+  .mascot-body {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 30% 28%, rgba(255,255,255,0.5) 0%, transparent 30%),
+      linear-gradient(160deg, var(--sprout) 0%, var(--sprout-deep) 100%);
+    box-shadow:
+      0 4px 0 var(--sprout-deep),
+      0 8px 16px -2px rgba(127, 166, 106, 0.3);
+  }
+  .mascot-eye {
+    position: absolute;
+    top: 38%;
+    width: 8px; height: 12px;
+    background: var(--ink);
+    border-radius: 50%;
+    z-index: 3;
+  }
+  .mascot-eye.l { left: 30%; }
+  .mascot-eye.r { right: 30%; }
+  .mascot-eye::after {
+    content: '';
+    position: absolute;
+    top: 2px; right: 1px;
+    width: 3px; height: 3px;
+    background: white;
+    border-radius: 50%;
+  }
+  .mascot-cheek {
+    position: absolute;
+    top: 56%;
+    width: 11px; height: 6px;
+    background: var(--strawberry);
+    border-radius: 50%;
+    opacity: 0.8;
+    z-index: 3;
+  }
+  .mascot-cheek.l { left: 15%; }
+  .mascot-cheek.r { right: 15%; }
+  .mascot-mouth {
+    position: absolute;
+    bottom: 30%; left: 50%;
+    transform: translateX(-50%);
+    width: 12px; height: 6px;
+    border: 2px solid var(--ink);
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    z-index: 3;
+  }
+
+  .login-brand {
+    text-align: center;
+    margin-bottom: var(--s8);
+  }
+  .login-brand h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: var(--t-3xl);
+    letter-spacing: var(--ls-3);
+    line-height: 1.2;
+    margin-bottom: var(--s1);
+    padding-left: 4px;
+  }
+  .login-brand .tagline {
+    font-family: var(--font-display);
+    font-weight: 500;
+    font-size: var(--t-md);
+    color: var(--ink-2);
+    letter-spacing: var(--ls-3);
+    line-height: 1.5;
+  }
+
+  .login-card {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: var(--s6);
+    margin-bottom: var(--s5);
+    box-shadow: var(--shadow-soft);
+  }
+  .login-card .card-title {
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    font-weight: 700;
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+    margin-bottom: var(--s1);
+  }
+  .login-card .card-sub {
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    line-height: 1.7;
+    font-weight: 500;
+    margin-bottom: var(--s5);
+  }
+
+  .input-clay {
+    display: block;
+    width: 100%;
+    padding: var(--s3) var(--s4);
+    background: var(--paper);
+    border: 1px solid var(--paper-3);
+    border-radius: var(--r-md);
+    font-family: var(--font-sans);
+    font-size: var(--t-lg);
+    color: var(--ink);
+    margin-bottom: var(--s3);
+    outline: none;
+    line-height: 1.4;
+    font-weight: 500;
+  }
+  .input-clay:focus { border-color: var(--strawberry); background: var(--white); }
+  .input-clay::placeholder { color: var(--ink-3); font-weight: 400; }
+  .input-clay.num {
+    font-family: var(--font-num);
+    font-size: var(--t-2xl);
+    letter-spacing: 6px;
+    font-weight: 800;
+    color: var(--strawberry-deep);
+    text-align: center;
+  }
+
+  .btn-clay {
+    display: block;
+    width: 100%;
+    padding: var(--s3);
+    background: linear-gradient(180deg, #ffc8c8 0%, var(--strawberry) 100%);
+    color: var(--white);
+    border: 0;
+    border-radius: var(--r-md);
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    font-weight: 700;
+    letter-spacing: var(--ls-3);
+    line-height: 1.5;
+    margin-top: var(--s2);
+    box-shadow:
+      0 3px 0 var(--strawberry-deep),
+      0 6px 14px -4px rgba(217, 115, 115, 0.4);
+    padding-left: calc(var(--s3) + var(--ls-3));
+  }
+
+  .features {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+    margin-bottom: var(--s5);
+  }
+  .feature-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s4);
+    padding: var(--s3) var(--s4);
+    background: var(--white);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-soft);
+  }
+  .feature-icon {
+    width: 36px; height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    border-radius: var(--r-md);
+    flex-shrink: 0;
+  }
+  .feature-icon.f1 { background: var(--sprout-soft); }
+  .feature-icon.f2 { background: var(--milk-blue-soft); }
+  .feature-icon.f3 { background: var(--peach-soft); }
+  .feature-icon.f4 { background: var(--strawberry-soft); }
+  .feature-text { flex: 1; min-width: 0; line-height: 1.4; }
+  .feature-title {
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    font-weight: 700;
+    letter-spacing: var(--ls-2);
+    margin-bottom: 2px;
+  }
+  .feature-desc {
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    line-height: 1.5;
+    font-weight: 500;
+  }
+
+  .invite-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    width: 100%;
+    padding: var(--s3);
+    background: var(--white);
+    border: 1px dashed var(--peach-deep);
+    border-radius: var(--r-md);
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    color: var(--peach-deep);
+    font-weight: 600;
+    letter-spacing: var(--ls-2);
+    margin-bottom: var(--s3);
+    line-height: 1.5;
+  }
+
+  .login-footer {
+    text-align: center;
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-1);
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  /* ============ Page 2 · index ============ */
+  .header-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    padding-bottom: var(--s4);
+    border-bottom: 1px solid var(--hairline);
+    margin-bottom: var(--s5);
+    line-height: 1.3;
+  }
+  .header-bar h2 {
+    flex: 1;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: var(--t-xl);
+    letter-spacing: var(--ls-3);
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+  }
+  .header-bar h2 .leaf { font-size: 16px; line-height: 1; }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-weight: 600;
+    letter-spacing: var(--ls-1);
+    line-height: 1;
+  }
+  .header-actions span {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+  }
+  .header-actions .nick {
+    color: var(--ink);
+    background: var(--peach-soft);
+    padding: 4px var(--s2);
+    border-radius: var(--r-pill);
+    font-weight: 700;
+  }
+  .header-actions .logout { color: var(--strawberry-deep); }
+
+  .action-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s3);
+    margin-bottom: var(--s5);
+  }
+  .action-clay {
+    text-align: center;
+    padding: var(--s4);
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    font-weight: 700;
+    color: var(--ink);
+    border: 0;
+    border-radius: var(--r-md);
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+    box-shadow:
+      0 2px 0 rgba(74, 58, 48, 0.08),
+      0 4px 10px -2px rgba(74, 58, 48, 0.08);
+  }
+  .action-clay.add { background: var(--sprout-soft); color: var(--sprout-deep); }
+  .action-clay.import { background: var(--milk-blue-soft); color: var(--milk-blue-deep); }
+
+  /* 作物卡 */
+  .crop-card {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: var(--s5);
+    margin-bottom: var(--s4);
+    box-shadow: var(--shadow-soft);
+    position: relative;
+  }
+  .crop-card:last-child { margin-bottom: 0; }
+
+  .crop-card.mature-card {
+    box-shadow:
+      0 0 0 2px var(--peach),
+      0 6px 20px -6px rgba(229, 160, 64, 0.4);
+    animation: wobble 3s infinite ease-in-out;
+  }
+  @keyframes wobble {
+    0%, 100% { transform: rotate(0deg); }
+    25%      { transform: rotate(0.4deg); }
+    75%      { transform: rotate(-0.4deg); }
+  }
+
+  .crop-card.locked-card {
+    background: var(--paper-2);
+    box-shadow: 0 1px 0 var(--paper-3);
+  }
+
+  .crop-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    margin-bottom: var(--s2);
+  }
+  .crop-icon {
+    width: 40px; height: 40px;
+    border-radius: var(--r-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+    background: var(--peach-soft);
+  }
+  .crop-icon.locked-icon { background: var(--milk-blue-soft); }
+  .crop-icon.harvest-icon { background: var(--sprout-soft); }
+  .crop-info {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.3;
+  }
+  .crop-name {
+    font-family: var(--font-display);
+    font-size: var(--t-lg);
+    font-weight: 700;
+    letter-spacing: var(--ls-2);
+    line-height: 1.3;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .crop-name .type-prefix {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--peach-deep);
+    font-weight: 700;
+    font-size: var(--t-base);
+    line-height: 1;
+  }
+  .crop-mut-tag {
+    display: inline-block;
+    margin-top: var(--s1);
+    font-family: var(--font-display);
+    font-size: var(--t-xs);
+    font-weight: 700;
+    color: var(--strawberry-deep);
+    background: var(--strawberry-soft);
+    padding: 2px var(--s2);
+    border-radius: var(--r-pill);
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+  }
+  .crop-mut-tag.dim {
+    color: var(--ink-2);
+    background: var(--paper-3);
+  }
+  .crop-actions-mini {
+    display: flex;
+    gap: var(--s1);
+  }
+  .icon-btn {
+    width: 28px; height: 28px;
+    background: var(--paper);
+    border: 0;
+    border-radius: var(--r-md);
+    color: var(--ink-3);
+    font-size: var(--t-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+
+  .crop-planted {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    margin-bottom: var(--s4);
+    letter-spacing: var(--ls-1);
+    line-height: 1.5;
+    font-weight: 600;
+  }
+
+  /* 湿润度 */
+  .moist-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    margin-bottom: var(--s2);
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    letter-spacing: var(--ls-1);
+    font-weight: 600;
+    line-height: 1;
+  }
+  .moist-row .moist-pct {
+    font-family: var(--font-num);
+    font-size: var(--t-md);
+    color: var(--milk-blue-deep);
+    font-weight: 800;
+    margin-left: auto;
+    line-height: 1;
+  }
+  .moist-bar {
+    height: 8px;
+    background: var(--milk-blue-soft);
+    border-radius: var(--r-pill);
+    overflow: hidden;
+    margin-bottom: var(--s4);
+  }
+  .moist-fill {
+    height: 100%;
+    width: 65%;
+    background: linear-gradient(90deg, var(--milk-blue), var(--milk-blue-deep));
+    border-radius: var(--r-pill);
+  }
+
+  /* 三路径 · pastel 软卡 */
+  .paths {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+    margin: var(--s2) 0 var(--s4);
+  }
+  .path-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s3);
+    padding: var(--s3) var(--s4);
+    border-radius: var(--r-md);
+  }
+  .path-row.fast    { background: var(--sprout-soft); }
+  .path-row.lazy    { background: var(--peach-soft); }
+  .path-row.natural { background: var(--milk-blue-soft); }
+  .path-bubble {
+    width: 32px; height: 32px;
+    background: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  }
+  .path-content {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.5;
+  }
+  .path-name {
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    font-weight: 700;
+    letter-spacing: var(--ls-1);
+    line-height: 1.3;
+    margin-bottom: var(--s1);
+    display: flex;
+    align-items: baseline;
+    gap: var(--s1);
+    flex-wrap: wrap;
+  }
+  .path-name.fast    { color: var(--sprout-deep); }
+  .path-name.lazy    { color: var(--peach-deep); }
+  .path-name.natural { color: var(--milk-blue-deep); }
+  .path-name .lazy-hint {
+    color: var(--ink-3);
+    font-size: var(--t-sm);
+    font-weight: 600;
+  }
+  .path-detail {
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    line-height: 1.6;
+    font-weight: 500;
+  }
+  .path-detail .num {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-weight: 700;
+    color: var(--ink);
+  }
+  .path-detail .est {
+    color: var(--ink-3);
+  }
+  .path-detail .warn {
+    display: block;
+    margin-top: var(--s1);
+    color: var(--strawberry-deep);
+    font-size: var(--t-xs);
+    line-height: 1.5;
+    font-weight: 600;
+  }
+
+  .water-tip {
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    margin-bottom: var(--s3);
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  .water-tip .num {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-weight: 800;
+    color: var(--ink-2);
+  }
+  .water-tip .reduce {
+    color: var(--sprout-deep);
+    font-weight: 800;
+  }
+
+  .btn-water {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: var(--s3);
+    background: linear-gradient(180deg, var(--milk-blue-soft) 0%, var(--milk-blue) 100%);
+    color: var(--milk-blue-deep);
+    border: 0;
+    border-radius: var(--r-md);
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    font-weight: 700;
+    letter-spacing: var(--ls-3);
+    line-height: 1.5;
+    box-shadow: 0 2px 0 var(--milk-blue-deep), 0 4px 10px -2px rgba(96, 144, 184, 0.3);
+    padding-left: calc(var(--s3) + var(--ls-3));
+  }
+
+  /* last-water */
+  .last-water-block {
+    text-align: center;
+    padding: var(--s4) 0 var(--s2);
+  }
+  .last-water-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    color: var(--peach-deep);
+    background: var(--peach-soft);
+    padding: 4px var(--s3);
+    border-radius: var(--r-pill);
+    font-weight: 700;
+    letter-spacing: var(--ls-3);
+    margin-bottom: var(--s3);
+    line-height: 1;
+  }
+  .countdown-num {
+    font-family: var(--font-num);
+    font-size: var(--t-4xl);
+    font-weight: 900;
+    color: var(--peach-deep);
+    line-height: 1;
+    letter-spacing: var(--ls-3);
+    text-shadow: 0 2px 0 rgba(255,255,255,0.5);
+  }
+  .last-water-sub {
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    margin-top: var(--s2);
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  .last-water-sub .num {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink);
+    font-weight: 800;
+  }
+  .btn-water-harvest {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: var(--s3);
+    background: linear-gradient(180deg, #ffd8a0 0%, var(--peach) 100%);
+    color: var(--white);
+    border: 0;
+    border-radius: var(--r-md);
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    font-weight: 700;
+    letter-spacing: var(--ls-3);
+    line-height: 1.5;
+    margin-top: var(--s3);
+    box-shadow:
+      0 3px 0 var(--peach-deep),
+      0 6px 14px -4px rgba(229, 160, 64, 0.5);
+    padding-left: calc(var(--s3) + var(--ls-3));
+  }
+
+  /* locked */
+  .locked-card .crop-icon { opacity: 0.7; }
+  .locked-box {
+    background: var(--white);
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    border-left: 3px solid var(--milk-blue);
+  }
+  .locked-head {
+    font-family: var(--font-display);
+    font-size: var(--t-md);
+    font-weight: 700;
+    color: var(--ink-2);
+    letter-spacing: var(--ls-2);
+    line-height: 1.5;
+    margin-bottom: var(--s1);
+  }
+  .locked-desc {
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    line-height: 1.7;
+    font-weight: 500;
+  }
+  .locked-desc .em {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink);
+    font-weight: 800;
+  }
+  .locked-desc .em.sprout { color: var(--sprout-deep); }
+  .locked-hint {
+    font-family: var(--font-display);
+    font-size: var(--t-xs);
+    color: var(--ink-3);
+    margin-top: var(--s2);
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  /* harvested */
+  .harvest-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    text-align: center;
+    font-family: var(--font-display);
+    font-size: var(--t-base);
+    color: var(--ink-2);
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+    margin: var(--s2) 0 var(--s4);
+    padding: var(--s2) 0;
+    background: var(--sprout-soft);
+    border-radius: var(--r-md);
+    font-weight: 700;
+  }
+  .harvest-status .check {
+    color: var(--sprout-deep);
+    font-weight: 800;
+  }
+  .harvest-status .num {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink);
+    font-weight: 800;
+  }
+  .harvest-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+  }
+  .btn-secondary {
+    padding: var(--s3);
+    background: var(--white);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-md);
+    font-family: var(--font-display);
+    font-size: var(--t-md);
+    color: var(--ink);
+    letter-spacing: var(--ls-2);
+    text-align: center;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  .btn-secondary.collected {
+    color: var(--sprout-deep);
+    background: var(--sprout-soft);
+    border-color: transparent;
+  }
+  .harvest-footer {
+    font-family: var(--font-display);
+    font-size: var(--t-xs);
+    color: var(--ink-3);
+    margin-top: var(--s3);
+    text-align: center;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+
+  /* ============ Page 3 · collection ============ */
+  .col-summary {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: var(--s5);
+    margin-bottom: var(--s4);
+    display: flex;
+    align-items: center;
+    gap: var(--s4);
+    box-shadow: var(--shadow-soft);
+  }
+  .col-summary-total {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-3xl);
+    color: var(--strawberry-deep);
+    font-weight: 900;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .col-summary-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+  }
+  .col-summary-label {
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-2);
+    line-height: 1;
+    font-weight: 600;
+  }
+  .col-summary-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s3);
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+  .col-summary-stats span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .col-summary-stats b {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink);
+    font-weight: 800;
+  }
+
+  .sort-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    margin-bottom: var(--s4);
+    padding: var(--s1);
+    background: var(--paper-2);
+    border-radius: var(--r-pill);
+  }
+  .sort-pill {
+    flex: 0 0 auto;
+    padding: var(--s2) var(--s3);
+    color: var(--ink-3);
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    font-weight: 700;
+    letter-spacing: var(--ls-1);
+    line-height: 1;
+    border-radius: var(--r-pill);
+  }
+  .sort-pill.active {
+    background: var(--white);
+    color: var(--strawberry-deep);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .sort-row .manual {
+    margin-left: auto;
+    color: var(--peach-deep);
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    font-weight: 700;
+    padding: var(--s2) var(--s3);
+    line-height: 1;
+  }
+
+  /* 拓本卡 */
+  .rubbing {
+    background: var(--white);
+    border-radius: var(--r-lg);
+    padding: var(--s4) var(--s5);
+    margin-bottom: var(--s3);
+    box-shadow: var(--shadow-soft);
+    position: relative;
+  }
+  .rubbing:last-child { margin-bottom: 0; }
+  .rubbing.hero-row {
+    background: linear-gradient(135deg, var(--peach-soft) 0%, var(--strawberry-soft) 100%);
+    box-shadow:
+      0 0 0 2px var(--peach),
+      var(--shadow-pop);
+  }
+
+  .rubbing-head {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    margin-bottom: var(--s2);
+  }
+  .rub-emoji {
+    width: 32px; height: 32px;
+    border-radius: var(--r-md);
+    background: var(--paper-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .hero-row .rub-emoji { background: var(--white); }
+  .rub-name {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-display);
+    font-size: var(--t-lg);
+    font-weight: 700;
+    letter-spacing: var(--ls-2);
+    line-height: 1.3;
+  }
+  .rub-mult {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-2xl);
+    font-weight: 900;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .rubbing.hero-row .rub-mult { color: var(--strawberry-deep); }
+  .rubbing.giant .rub-mult    { color: var(--peach-deep); }
+  .rubbing.purple .rub-mult   { color: var(--lilac-deep); }
+  .rubbing.normal .rub-mult   { color: var(--milk-blue-deep); }
+
+  .rub-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s1);
+    margin: var(--s1) 0 var(--s2);
+    line-height: 1.4;
+  }
+  .rub-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-display);
+    font-size: var(--t-xs);
+    font-weight: 700;
+    letter-spacing: var(--ls-1);
+    padding: 3px var(--s2);
+    border-radius: var(--r-pill);
+    line-height: 1.3;
+  }
+  .rub-badge.hero    { background: var(--strawberry-soft); color: var(--strawberry-deep); }
+  .rub-badge.giant   { background: var(--peach-soft); color: var(--peach-deep); }
+  .rub-badge.purple  { background: var(--lilac-soft); color: var(--lilac-deep); }
+  .rub-badge.normal  { background: var(--milk-blue-soft); color: var(--milk-blue-deep); }
+
+  .rub-note {
+    font-family: var(--font-display);
+    font-size: var(--t-sm);
+    font-style: italic;
+    color: var(--ink-2);
+    line-height: 1.6;
+    margin: var(--s2) 0;
+    padding-left: var(--s2);
+    border-left: 2px solid var(--peach-soft);
+    font-weight: 500;
+  }
+  .rub-shot {
+    height: 80px;
+    background:
+      radial-gradient(circle at 50% 40%, var(--peach-soft) 0%, var(--strawberry-soft) 100%);
+    border-radius: var(--r-md);
+    margin: var(--s2) 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    line-height: 1;
+  }
+  .hero-row .rub-shot {
+    background: radial-gradient(circle at 50% 40%, var(--white), var(--peach-soft) 70%);
+  }
+  .purple .rub-shot { background: radial-gradient(circle at 50% 40%, var(--lilac-soft) 0%, var(--lilac) 100%); }
+  .giant .rub-shot { background: radial-gradient(circle at 50% 40%, var(--peach-soft), var(--peach) 100%); }
+  .normal .rub-shot { background: radial-gradient(circle at 50% 40%, var(--milk-blue-soft), var(--milk-blue) 100%); }
+
+  .rub-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    margin-top: var(--s2);
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-weight: 700;
+    line-height: 1;
+  }
+  .rub-foot .pub-tag {
+    font-family: var(--font-display);
+    font-style: normal;
+    font-size: var(--t-xs);
+    padding: 2px var(--s2);
+    border-radius: var(--r-pill);
+    font-weight: 700;
+    letter-spacing: var(--ls-1);
+    line-height: 1.4;
+  }
+  .rub-foot .pub-tag.public  { background: var(--sprout-soft); color: var(--sprout-deep); }
+  .rub-foot .pub-tag.private { background: var(--paper-3); color: var(--ink-3); }
+  .rub-foot .actions {
+    margin-left: auto;
+    display: flex;
+    gap: var(--s2);
+    font-style: normal;
+  }
+  .rub-foot .actions span {
+    font-family: var(--font-display);
+    color: var(--ink-3);
+    font-size: var(--t-sm);
+    line-height: 1;
+    font-weight: 600;
+  }
+
+</style>
+</head>
+<body>
+
+<header class="ref-card">
+  <div>
+    <h1><span class="accent">I.</span> 软 萌 粘 土 田 园 · 灵 动 v3</h1>
+    <div class="ref-sub">docs/design-explorations.md §8 方向 I &nbsp;·&nbsp; 1:1 wxml &nbsp;·&nbsp; 5 色 pastel &nbsp;·&nbsp; 圆角 12-20px &nbsp;·&nbsp; 即熟卡 wobble 微动</div>
+  </div>
+  <div class="ref-swatches">
+    <span style="background:#fff9f0" title="paper"></span>
+    <span style="background:#ffffff" title="white"></span>
+    <span style="background:#f5b0b0" title="strawberry"></span>
+    <span style="background:#b5d4a0" title="sprout"></span>
+    <span style="background:#ffd17a" title="peach"></span>
+    <span style="background:#b5d2e8" title="milk-blue"></span>
+    <span style="background:#d4b8e8" title="lilac"></span>
+    <span style="background:#4a3a30" title="ink"></span>
+  </div>
+  <div class="ref-sub">
+    <b>字体</b>　Fredoka(圆润标题) · Quicksand(正文) · <i style="font-family:Nunito">Nunito</i>(数字)<br>
+    <b>灵动</b>　pastel 多色和谐 · 圆角 squircle · 即熟卡 0.5° wobble · 登录页种子吉祥物
+  </div>
+</header>
+
+<main class="screens">
+
+  <!-- ============ Page 1 · login ============ -->
+  <section class="screen no-tabbar page-login">
+    <div class="screen-label">i.</div>
+
+    <div class="login-mascot">
+      <div class="mascot-leaf"></div>
+      <div class="mascot-body"></div>
+      <div class="mascot-eye l"></div>
+      <div class="mascot-eye r"></div>
+      <div class="mascot-cheek l"></div>
+      <div class="mascot-cheek r"></div>
+      <div class="mascot-mouth"></div>
+    </div>
+
+    <div class="login-brand">
+      <h1>农场助手</h1>
+      <div class="tagline">浇 水 提 醒 · 纪 念 册 分 享</div>
+    </div>
+
+    <div class="login-card">
+      <div class="card-title">登录 / 注册</div>
+      <div class="card-sub">昵称不存在会自动注册<br>PIN 用于保护写操作</div>
+      <input class="input-clay" placeholder="昵称" value="长缨">
+      <input class="input-clay num" placeholder="4 位 PIN" value="••••" type="text">
+      <button class="btn-clay">登 录 / 注 册</button>
+    </div>
+
+    <div class="features">
+      <div class="feature-row">
+        <div class="feature-icon f1">⏱️</div>
+        <div class="feature-text">
+          <div class="feature-title">实时浇水推荐</div>
+          <div class="feature-desc">浇一次立即重算下次最优时机</div>
+        </div>
+      </div>
+      <div class="feature-row">
+        <div class="feature-icon f2">🌾</div>
+        <div class="feature-text">
+          <div class="feature-title">三种路径任选</div>
+          <div class="feature-desc">最快 · 懒人 · 自然</div>
+        </div>
+      </div>
+      <div class="feature-row">
+        <div class="feature-icon f3">🏆</div>
+        <div class="feature-text">
+          <div class="feature-title">纪念册</div>
+          <div class="feature-desc">收藏稀有变异，跟好友炫耀</div>
+        </div>
+      </div>
+      <div class="feature-row">
+        <div class="feature-icon f4">👥</div>
+        <div class="feature-text">
+          <div class="feature-title">朋友圈互动</div>
+          <div class="feature-desc">看好友农场，点赞 / 提问号</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="invite-btn">📨<span>邀请朋友一起种田</span></button>
+    <div class="login-footer">用得开心 ?  分享给朋友吧</div>
+  </section>
+
+  <!-- ============ Page 2 · index ============ -->
+  <section class="screen page-index">
+    <div class="screen-label">ii.</div>
+
+    <div class="header-bar">
+      <h2><span class="leaf">🌱</span><span>我的农场</span></h2>
+      <div class="header-actions">
+        <span>刷新</span>
+        <span>分享</span>
+        <span class="nick">长缨</span>
+        <span class="logout">登出</span>
+      </div>
+    </div>
+
+    <div class="action-pair">
+      <button class="action-clay add">+ 新种作物</button>
+      <button class="action-clay import">已种了怎么办</button>
+    </div>
+
+    <!-- Card 1: normal · 16h 玉米 -->
+    <div class="crop-card">
+      <div class="crop-head">
+        <div class="crop-icon">🌽</div>
+        <div class="crop-info">
+          <div class="crop-name">
+            <span class="type-prefix">16h</span>
+            <span>玉米</span>
+          </div>
+          <span class="crop-mut-tag">巨大化 ×8</span>
+        </div>
+        <div class="crop-actions-mini">
+          <button class="icon-btn">✎</button>
+          <button class="icon-btn">✕</button>
+        </div>
+      </div>
+      <div class="crop-planted">种于  2026.04.30  09:30</div>
+
+      <div class="moist-row">
+        <span>💧 湿润度</span>
+        <span class="moist-pct">65%</span>
+      </div>
+      <div class="moist-bar"><div class="moist-fill"></div></div>
+
+      <div class="paths">
+        <div class="path-row fast">
+          <div class="path-bubble">🏃</div>
+          <div class="path-content">
+            <div class="path-name fast"><span>最快路径</span></div>
+            <div class="path-detail">
+              浇水时机：<span class="num">18:00 前</span> · 距浇水 <span class="num">8h 30min</span>
+              <span class="est"> · 预计成熟 17:30 次日</span>
+              <span class="warn">⚠ 21:00 后进入禁浇期，浇水会无法即熟</span>
+            </div>
+          </div>
+        </div>
+        <div class="path-row lazy">
+          <div class="path-bubble">💤</div>
+          <div class="path-content">
+            <div class="path-name lazy">
+              <span>懒人路径</span>
+              <span class="lazy-hint">· 浇水即熟</span>
+            </div>
+            <div class="path-detail">
+              浇水时机：<span class="num">01:00 次日</span> · 距浇水 <span class="num">15h 30min</span>
+              <span class="est"> · 预计成熟 03:30 次日</span>
+            </div>
+          </div>
+        </div>
+        <div class="path-row natural">
+          <div class="path-bubble">🌱</div>
+          <div class="path-content">
+            <div class="path-name natural"><span>自然生长</span></div>
+            <div class="path-detail">
+              不再浇水
+              <span class="est"> · 预计成熟 13:30 次日 · 距成熟 <span class="num">28h</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="water-tip">
+        已浇 <span class="num">5</span> 次 · 💧 现在浇水可减 <span class="reduce num">30 min</span>
+      </div>
+      <button class="btn-water">浇 水</button>
+    </div>
+
+    <!-- Card 2: last-water · 32h 蓝莓 -->
+    <div class="crop-card mature-card">
+      <div class="crop-head">
+        <div class="crop-icon">🫐</div>
+        <div class="crop-info">
+          <div class="crop-name">
+            <span class="type-prefix">32h</span>
+            <span>蓝莓</span>
+          </div>
+          <span class="crop-mut-tag">巨大化 ×8</span>
+        </div>
+        <div class="crop-actions-mini">
+          <button class="icon-btn">✎</button>
+          <button class="icon-btn">✕</button>
+        </div>
+      </div>
+      <div class="crop-planted">种于  2026.04.29  22:00</div>
+
+      <div class="last-water-block">
+        <div class="last-water-tag">🔴 浇水即熟阶段</div>
+        <div class="countdown-num">00:48</div>
+        <div class="last-water-sub">现在浇水立即成熟 · 已浇 <span class="num">12</span> 次</div>
+      </div>
+      <button class="btn-water-harvest">浇 水 + 收 获</button>
+    </div>
+
+    <!-- Card 3: locked · 8h 麦穗 -->
+    <div class="crop-card locked-card">
+      <div class="crop-head">
+        <div class="crop-icon locked-icon">🌾</div>
+        <div class="crop-info">
+          <div class="crop-name">
+            <span class="type-prefix">8h</span>
+            <span>麦穗</span>
+          </div>
+          <span class="crop-mut-tag dim">普通 ×1.5</span>
+        </div>
+        <div class="crop-actions-mini">
+          <button class="icon-btn">✎</button>
+          <button class="icon-btn">✕</button>
+        </div>
+      </div>
+      <div class="crop-planted">种于  2026.04.30  06:00</div>
+
+      <div class="locked-box">
+        <div class="locked-head">🔒 冷却锁定 · 无法再浇水</div>
+        <div class="locked-desc">
+          上次浇水冷却至 <span class="em">13:30</span>，但作物会先于 <span class="em sprout">14:00</span> 自然成熟（<span class="em">8h</span> 后）。
+        </div>
+        <div class="locked-hint">不用任何操作，等自然成熟直接收。</div>
+      </div>
+    </div>
+
+    <!-- Card 4: harvested · 16h 玉米 -->
+    <div class="crop-card">
+      <div class="crop-head">
+        <div class="crop-icon harvest-icon">🌽</div>
+        <div class="crop-info">
+          <div class="crop-name">
+            <span class="type-prefix">16h</span>
+            <span>我的高产玉米</span>
+          </div>
+          <span class="crop-mut-tag">紫色 · 琉璃 ×3</span>
+        </div>
+        <div class="crop-actions-mini">
+          <button class="icon-btn">✎</button>
+          <button class="icon-btn">✕</button>
+        </div>
+      </div>
+      <div class="crop-planted">种于  2026.04.28  12:00</div>
+
+      <div class="harvest-status">
+        <span class="check">✓</span>
+        <span>已收获</span>
+        <span>·</span>
+        <span class="num">04.29  04:00</span>
+      </div>
+      <div class="harvest-actions">
+        <button class="btn-secondary">↻ 再种一棵 （同类型 · 沿用立刻浇水）</button>
+        <button class="btn-secondary collected">✓ 已收入纪念册 · 点此查看</button>
+      </div>
+      <div class="harvest-footer">30 分钟后自动清理</div>
+    </div>
+
+    <nav class="tabbar">
+      <div class="tab-item active">
+        <div class="tab-icon-wrap"><span class="tab-icon">🌱</span></div>
+        <span>主页</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap"><span class="tab-icon">🏆</span></div>
+        <span>纪念册</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap"><span class="tab-icon">🌐</span></div>
+        <span>朋友圈</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap">
+          <span class="tab-icon">🤝</span>
+          <span class="tab-badge">2</span>
+        </div>
+        <span>好友</span>
+      </div>
+    </nav>
+  </section>
+
+  <!-- ============ Page 3 · collection ============ -->
+  <section class="screen page-collection">
+    <div class="screen-label">iii.</div>
+
+    <div class="header-bar">
+      <h2><span class="leaf">🏆</span><span>我的纪念册</span></h2>
+      <div class="header-actions">
+        <span>刷新</span>
+        <span class="nick">长缨</span>
+      </div>
+    </div>
+
+    <div class="col-summary">
+      <div class="col-summary-total">5</div>
+      <div class="col-summary-info">
+        <div class="col-summary-label">件 收 藏</div>
+        <div class="col-summary-stats">
+          <span>🌈 英雄 <b>1</b></span>
+          <span>🟡 巨大化 <b>2</b></span>
+          <span>🟣 紫色 <b>2</b></span>
+          <span>🔵 普通 <b>1</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sort-row">
+      <div class="sort-pill active">倍数 ↓</div>
+      <div class="sort-pill">时间 ↓</div>
+      <div class="manual">+ 手动录入</div>
+    </div>
+
+    <!-- 1. 玉米 永夜之心 -->
+    <div class="rubbing hero-row">
+      <div class="rubbing-head">
+        <div class="rub-emoji">🌽</div>
+        <div class="rub-name">玉米 · 永夜之心</div>
+        <div class="rub-mult">×28</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge hero">英雄 ×28</span>
+        <span class="rub-badge giant">巨大化 ×8</span>
+        <span class="rub-badge purple">紫色 · 青玉 ×2.5</span>
+      </div>
+      <div class="rub-note">"永夜之心 · 28 倍金光 · 一辈子就这一棵"</div>
+      <div class="rub-shot">🌽</div>
+      <div class="rub-foot">
+        <span>04.28 22:13</span>
+        <span class="pub-tag public">● 公开</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <!-- 2. 蓝莓 高产巨型 -->
+    <div class="rubbing giant">
+      <div class="rubbing-head">
+        <div class="rub-emoji">🫐</div>
+        <div class="rub-name">蓝莓 · 高产巨型</div>
+        <div class="rub-mult">×11</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge giant">巨大化 ×8</span>
+        <span class="rub-badge purple">紫色 · 琉璃 ×3</span>
+      </div>
+      <div class="rub-note">"巨大化叠琉璃，夜晚出货"</div>
+      <div class="rub-shot">🫐</div>
+      <div class="rub-foot">
+        <span>04.20 14:02</span>
+        <span class="pub-tag public">● 公开</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <!-- 3. 玉米 青玉 -->
+    <div class="rubbing purple">
+      <div class="rubbing-head">
+        <div class="rub-emoji">🌽</div>
+        <div class="rub-name">玉米 · 青玉</div>
+        <div class="rub-mult">×2.5</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge purple">紫色 · 青玉 ×2.5</span>
+      </div>
+      <div class="rub-shot">🌽</div>
+      <div class="rub-foot">
+        <span>04.18 09:45</span>
+        <span class="pub-tag private">○ 私密</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <!-- 4. 蓝莓 巨型 -->
+    <div class="rubbing giant">
+      <div class="rubbing-head">
+        <div class="rub-emoji">🫐</div>
+        <div class="rub-name">蓝莓 · 巨型</div>
+        <div class="rub-mult">×8</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge giant">巨大化 ×8</span>
+      </div>
+      <div class="rub-note">"周末双倍翻盘"</div>
+      <div class="rub-foot">
+        <span>04.15 19:21</span>
+        <span class="pub-tag public">● 公开</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <!-- 5. 麦穗 颜色 -->
+    <div class="rubbing normal">
+      <div class="rubbing-head">
+        <div class="rub-emoji">🌾</div>
+        <div class="rub-name">麦穗 · 颜色</div>
+        <div class="rub-mult">×1.5</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge normal">普通 ×1.5</span>
+      </div>
+      <div class="rub-foot">
+        <span>04.10 11:08</span>
+        <span class="pub-tag public">● 公开</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <nav class="tabbar">
+      <div class="tab-item">
+        <div class="tab-icon-wrap"><span class="tab-icon">🌱</span></div>
+        <span>主页</span>
+      </div>
+      <div class="tab-item active">
+        <div class="tab-icon-wrap"><span class="tab-icon">🏆</span></div>
+        <span>纪念册</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap"><span class="tab-icon">🌐</span></div>
+        <span>朋友圈</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap">
+          <span class="tab-icon">🤝</span>
+          <span class="tab-badge">2</span>
+        </div>
+        <span>好友</span>
+      </div>
+    </nav>
+  </section>
+
+</main>
+
+</body>
+</html>
