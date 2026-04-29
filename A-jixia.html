@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>方向 A · 稷下风尚 · 淡墨重做版 v3 (精细对齐)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Noto+Sans+SC:wght@300;400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* === 颜色 === */
+    --paper:    #fbf8f1;
+    --paper-2:  #f5f0e6;
+    --paper-3:  #ebe4d4;
+    --white:    #ffffff;
+    --ink:      #2a2418;
+    --ink-2:    #5c5040;
+    --ink-3:    #a09682;
+    --hairline: #e0d6bc;
+    --seal:     #b94a3b;
+    --seal-soft:#e8c2b8;
+    --bamboo:   #8da66f;
+    --bamboo-soft:#dee5cc;
+    --gold:     #c9a663;
+    --purple:   #8b6db5;
+    --blue:     #5a8cb5;
+
+    /* === 间距(8 级 scale,所有 padding/gap/margin 用这套) === */
+    --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+    --s5: 20px; --s6: 24px; --s7: 28px; --s8: 32px;
+
+    /* === 字号 === */
+    --t-xs: 10px; --t-sm: 11px; --t-md: 12px; --t-base: 13px;
+    --t-lg: 15px; --t-xl: 18px; --t-2xl: 22px; --t-3xl: 28px; --t-4xl: 44px;
+
+    /* === 字距(5 档系统) === */
+    --ls-0: 0;
+    --ls-1: 0.5px;
+    --ls-2: 2px;
+    --ls-3: 4px;
+    --ls-4: 8px;
+
+    /* === 字体 === */
+    --font-serif: 'Noto Serif SC', 'Songti SC', serif;
+    --font-sans:  'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
+    --font-num:   'Cormorant Garamond', 'Noto Serif SC', serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: auto; }
+  body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+    color: var(--ink);
+    background: #ddd2b8;
+    min-height: 100vh;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  input { font: inherit; color: inherit; }
+
+  /* ============ Reference card ============ */
+  .ref-card {
+    background: var(--paper);
+    color: var(--ink);
+    padding: var(--s5) var(--s8);
+    display: flex;
+    align-items: center;
+    gap: var(--s8);
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--hairline);
+    line-height: 1.5;
+  }
+  .ref-card h1 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: var(--t-lg);
+    letter-spacing: var(--ls-3);
+    line-height: 1.3;
+  }
+  .ref-card h1 .accent {
+    color: var(--seal);
+    margin-right: 6px;
+    font-family: var(--font-num);
+    font-style: italic;
+  }
+  .ref-card .ref-sub {
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-1);
+    line-height: 1.7;
+  }
+  .ref-card b { color: var(--ink-2); font-weight: 500; }
+  .ref-card i { font-style: italic; }
+  .ref-swatches { display: flex; gap: var(--s1); }
+  .ref-swatches span {
+    display: block;
+    width: 18px; height: 18px;
+    border: 1px solid var(--hairline);
+  }
+
+  /* ============ Screens ============ */
+  .screens {
+    display: flex;
+    gap: var(--s8);
+    padding: var(--s8);
+    overflow-x: auto;
+    align-items: flex-start;
+  }
+  .screen {
+    flex: 0 0 375px;
+    min-height: 812px;
+    background: var(--paper);
+    box-shadow: 0 1px 0 var(--hairline), 0 12px 32px -12px rgba(42, 36, 24, 0.18);
+    position: relative;
+    padding: var(--s7) var(--s6) 84px;
+    display: flex;
+    flex-direction: column;
+  }
+  .screen.no-tabbar { padding-bottom: var(--s8); }
+  .screen-label {
+    position: absolute;
+    top: var(--s2);
+    right: var(--s4);
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-1);
+    line-height: 1;
+  }
+
+  /* ============ TabBar ============ */
+  .tabbar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 64px;
+    background: var(--white);
+    border-top: 1px solid var(--hairline);
+    display: flex;
+  }
+  .tab-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s1);
+    font-family: var(--font-serif);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    color: var(--ink-3);
+    letter-spacing: var(--ls-2);
+    line-height: 1;
+    position: relative;
+  }
+  .tab-item .tab-icon-wrap {
+    position: relative;
+    width: 24px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tab-item .tab-icon {
+    font-size: 18px;
+    line-height: 1;
+    opacity: 0.65;
+  }
+  .tab-item.active { color: var(--seal); font-weight: 600; }
+  .tab-item.active .tab-icon { opacity: 1; }
+  .tab-badge {
+    position: absolute;
+    top: -2px;
+    left: calc(50% + 8px);
+    min-width: 14px;
+    height: 14px;
+    padding: 0 4px;
+    background: var(--seal);
+    color: var(--white);
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: 9px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  /* ============ 共用 ============ */
+  .seal-mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--seal);
+    color: var(--white);
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: var(--t-xl);
+    line-height: 1;
+    flex-shrink: 0;
+    transform: rotate(-3deg);
+  }
+
+  /* ============ Page 1 · login ============ */
+  .page-login { padding: 72px var(--s8) var(--s8); }
+  .login-brand {
+    text-align: center;
+    margin-bottom: var(--s8);
+  }
+  .login-brand .seal-big {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px; height: 36px;
+    background: var(--seal);
+    color: var(--white);
+    font-family: var(--font-serif);
+    font-weight: 700;
+    font-size: var(--t-xl);
+    line-height: 1;
+    margin-bottom: var(--s5);
+    transform: rotate(-3deg);
+  }
+  .login-brand h1 {
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: var(--t-3xl);
+    letter-spacing: 6px;
+    line-height: 1.2;
+    margin-bottom: var(--s2);
+    /* letter-spacing 视觉补偿:右侧多一档 */
+    padding-left: 6px;
+  }
+  .login-brand .tagline {
+    font-family: var(--font-sans);
+    font-weight: 300;
+    font-size: var(--t-md);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-2);
+    line-height: 1.5;
+  }
+
+  .login-card {
+    background: var(--white);
+    border: 1px solid var(--hairline);
+    padding: var(--s6);
+    margin-bottom: var(--s7);
+  }
+  .login-card .card-title {
+    font-family: var(--font-serif);
+    font-size: var(--t-base);
+    font-weight: 500;
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+    margin-bottom: var(--s1);
+  }
+  .login-card .card-sub {
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    line-height: 1.7;
+    font-weight: 300;
+    margin-bottom: var(--s5);
+  }
+
+  .input-line {
+    display: block;
+    width: 100%;
+    padding: var(--s3) 0 10px;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-sans);
+    font-size: var(--t-lg);
+    color: var(--ink);
+    margin-bottom: var(--s4);
+    outline: none;
+    line-height: 1.4;
+  }
+  .input-line:focus { border-bottom-color: var(--seal); }
+  .input-line::placeholder { color: var(--ink-3); font-weight: 300; }
+  .input-line.num {
+    font-family: var(--font-num);
+    font-size: var(--t-2xl);
+    letter-spacing: 6px;
+    font-weight: 500;
+    color: var(--seal);
+    text-align: left;
+  }
+
+  .btn-line {
+    display: block;
+    width: 100%;
+    padding: var(--s3);
+    background: var(--seal);
+    color: var(--white);
+    border: 0;
+    font-family: var(--font-serif);
+    font-size: var(--t-base);
+    font-weight: 500;
+    letter-spacing: var(--ls-4);
+    line-height: 1.5;
+    margin-top: var(--s2);
+    /* letter-spacing 居中视觉补偿 */
+    padding-left: calc(var(--s3) + var(--ls-4));
+  }
+
+  .features {
+    background: var(--white);
+    border: 1px solid var(--hairline);
+    padding: var(--s6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s5);
+    margin-bottom: var(--s6);
+  }
+  .feature-row {
+    display: flex;
+    align-items: center;   /* center 不是 baseline */
+    gap: var(--s4);
+  }
+  .feature-num {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-xl);
+    color: var(--seal);
+    font-weight: 500;
+    width: 32px;            /* 固定宽,右对齐让 . 都在同一垂直线 */
+    text-align: right;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .feature-text {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.4;
+  }
+  .feature-title {
+    font-family: var(--font-serif);
+    font-size: var(--t-base);
+    font-weight: 500;
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+    margin-bottom: var(--s1);
+  }
+  .feature-desc {
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  .invite-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    width: 100%;
+    text-align: center;
+    font-family: var(--font-serif);
+    font-size: var(--t-base);
+    color: var(--ink-2);
+    letter-spacing: var(--ls-2);
+    padding: var(--s3) 0;
+    background: var(--white);
+    border: 1px solid var(--hairline);
+    margin-bottom: var(--s4);
+    line-height: 1.5;
+  }
+
+  .login-footer {
+    text-align: center;
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-1);
+    font-weight: 300;
+    line-height: 1.5;
+  }
+
+  /* ============ Page 2 · index ============ */
+  .header-bar {
+    display: flex;
+    align-items: center;     /* center 不是 baseline */
+    gap: var(--s3);
+    padding-bottom: var(--s4);
+    border-bottom: 1px solid var(--hairline);
+    margin-bottom: var(--s5);
+    line-height: 1.3;
+  }
+  .header-bar h2 {
+    flex: 1;
+    font-family: var(--font-serif);
+    font-weight: 600;
+    font-size: var(--t-xl);
+    letter-spacing: var(--ls-3);
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+  }
+  .header-bar h2 .leaf {
+    color: var(--bamboo);
+    font-size: 14px;
+    line-height: 1;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-1);
+    line-height: 1;
+  }
+  .header-actions span {
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+  }
+  .header-actions .nick {
+    color: var(--ink);
+    font-family: var(--font-serif);
+    font-weight: 500;
+  }
+  .header-actions .logout { color: var(--seal); }
+
+  .action-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s3);
+    margin-bottom: var(--s5);
+  }
+  .action-line {
+    text-align: center;
+    padding: var(--s4);
+    font-family: var(--font-serif);
+    font-size: var(--t-base);
+    font-weight: 500;
+    color: var(--ink);
+    background: var(--white);
+    border: 1px dashed var(--bamboo);
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+  }
+  .action-line.import { border-color: var(--ink-3); color: var(--ink-2); }
+
+  /* 作物卡 */
+  .crop-card {
+    background: var(--white);
+    border: 1px solid var(--hairline);
+    padding: var(--s5);
+    margin-bottom: var(--s4);
+    position: relative;
+  }
+  .crop-card:last-child { margin-bottom: 0; }
+  /* mature ring: 左侧朱砂 3px 不影响内容宽度 */
+  .crop-card.mature-ring {
+    border-color: var(--seal);
+    box-shadow: inset 3px 0 0 var(--seal);
+  }
+  .crop-card.locked-card {
+    background: var(--paper-2);
+    border-color: var(--paper-3);
+  }
+
+  .crop-head {
+    display: flex;
+    align-items: center;        /* center */
+    gap: var(--s2);
+    margin-bottom: var(--s1);
+  }
+  .crop-emoji {
+    width: 22px; height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .crop-title {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-serif);
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: var(--ls-2);
+    line-height: 1.3;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .crop-title .type-prefix {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink-3);
+    font-weight: 500;
+    font-size: var(--t-base);
+    line-height: 1;
+  }
+  .crop-edit, .crop-del {
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    line-height: 1;
+    padding: var(--s1) var(--s1);
+  }
+  .crop-edit:hover, .crop-del:hover { color: var(--seal); }
+
+  .crop-planted {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    margin-bottom: var(--s4);
+    letter-spacing: var(--ls-1);
+    line-height: 1.5;
+  }
+
+  /* 湿润度 */
+  .moist-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    margin-bottom: var(--s1);
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    letter-spacing: var(--ls-1);
+    line-height: 1;
+  }
+  .moist-row .moist-pct {
+    font-family: var(--font-num);
+    font-size: var(--t-base);
+    color: var(--ink);
+    font-weight: 500;
+    margin-left: auto;
+    line-height: 1;
+  }
+  .moist-bar {
+    height: 3px;
+    background: var(--paper-3);
+    overflow: hidden;
+    margin-bottom: var(--s4);
+  }
+  .moist-fill {
+    height: 100%;
+    width: 65%;
+    background: var(--bamboo);
+  }
+
+  /* 三路径 */
+  .paths {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+    margin: var(--s2) 0 var(--s4);
+    padding: var(--s4);
+    background: var(--paper-2);
+    border: 1px solid var(--hairline);
+  }
+  .path-row {
+    display: flex;
+    align-items: flex-start;     /* multi-line content 用 start */
+    gap: var(--s3);
+  }
+  .path-icon {
+    width: 18px; height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .path-content {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.5;
+  }
+  .path-name {
+    font-family: var(--font-serif);
+    font-size: var(--t-md);
+    font-weight: 500;
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+    margin-bottom: var(--s1);
+  }
+  .path-name .name-tag.fast { color: var(--bamboo); }
+  .path-name .name-tag.lazy { color: var(--seal); }
+  .path-name .name-tag.natural { color: var(--ink-2); }
+  .path-name .lazy-hint {
+    color: var(--ink-3);
+    font-weight: 400;
+    font-size: var(--t-sm);
+  }
+  .path-detail {
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    line-height: 1.7;
+    font-weight: 300;
+  }
+  .path-detail .num {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--ink);
+  }
+  .path-detail .est {
+    color: var(--ink-3);
+  }
+  .path-detail .warn {
+    display: block;
+    margin-top: var(--s1);
+    color: var(--seal);
+    font-size: var(--t-xs);
+    line-height: 1.5;
+  }
+
+  .water-tip {
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    margin-bottom: var(--s3);
+    font-weight: 300;
+    line-height: 1.5;
+  }
+  .water-tip .num {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  .water-tip .reduce {
+    color: var(--bamboo);
+    font-weight: 500;
+  }
+
+  .btn-water {
+    width: 100%;
+    padding: var(--s3);
+    background: transparent;
+    color: var(--bamboo);
+    border: 1px solid var(--bamboo);
+    font-family: var(--font-serif);
+    font-size: var(--t-base);
+    font-weight: 500;
+    letter-spacing: var(--ls-3);
+    line-height: 1.5;
+    padding-left: calc(var(--s3) + var(--ls-3));
+  }
+
+  /* last-water */
+  .last-water-block {
+    text-align: center;
+    padding: var(--s5) 0 var(--s3);
+  }
+  .last-water-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--s2);
+    font-family: var(--font-serif);
+    font-size: var(--t-sm);
+    color: var(--seal);
+    letter-spacing: var(--ls-3);
+    line-height: 1;
+    margin-bottom: var(--s3);
+  }
+  .last-water-tag::before, .last-water-tag::after {
+    content: '';
+    width: 16px; height: 1px;
+    background: var(--seal-soft);
+  }
+  .countdown-num {
+    font-family: var(--font-num);
+    font-size: var(--t-4xl);
+    font-weight: 500;
+    color: var(--ink);
+    line-height: 1;
+    letter-spacing: var(--ls-3);
+  }
+  .last-water-sub {
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    margin-top: var(--s2);
+    font-weight: 300;
+    line-height: 1.5;
+  }
+  .last-water-sub .num {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+  .btn-water-harvest {
+    width: 100%;
+    padding: var(--s3);
+    background: var(--seal);
+    color: var(--white);
+    border: 0;
+    font-family: var(--font-serif);
+    font-size: var(--t-base);
+    font-weight: 500;
+    letter-spacing: var(--ls-3);
+    line-height: 1.5;
+    margin-top: var(--s2);
+    padding-left: calc(var(--s3) + var(--ls-3));
+  }
+
+  /* locked */
+  .locked-card .crop-emoji,
+  .locked-card .crop-title { opacity: 0.85; }
+  .locked-box {
+    background: var(--paper);
+    padding: var(--s4);
+    border: 1px solid var(--hairline);
+    border-left: 2px solid var(--ink-3);
+  }
+  .locked-head {
+    font-family: var(--font-serif);
+    font-size: var(--t-md);
+    font-weight: 500;
+    color: var(--ink-2);
+    letter-spacing: var(--ls-2);
+    line-height: 1.5;
+    margin-bottom: var(--s1);
+  }
+  .locked-desc {
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    line-height: 1.7;
+    font-weight: 300;
+  }
+  .locked-desc .em {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .locked-desc .em.bamboo { color: var(--bamboo); }
+  .locked-hint {
+    font-family: var(--font-sans);
+    font-size: var(--t-xs);
+    color: var(--ink-3);
+    margin-top: var(--s2);
+    font-weight: 300;
+    line-height: 1.5;
+  }
+
+  /* harvested */
+  .harvest-status {
+    text-align: center;
+    font-family: var(--font-serif);
+    font-size: var(--t-base);
+    color: var(--ink-2);
+    letter-spacing: var(--ls-2);
+    line-height: 1.4;
+    margin: var(--s2) 0 var(--s4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+  }
+  .harvest-status .check {
+    color: var(--bamboo);
+    font-weight: 600;
+  }
+  .harvest-status .num {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink-2);
+  }
+  .harvest-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+  }
+  .btn-secondary {
+    padding: 10px var(--s3);
+    background: transparent;
+    border: 1px solid var(--hairline);
+    font-family: var(--font-serif);
+    font-size: var(--t-md);
+    color: var(--ink);
+    letter-spacing: var(--ls-2);
+    text-align: center;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+  .btn-secondary.collected {
+    color: var(--ink-3);
+    border-style: dashed;
+  }
+  .harvest-footer {
+    font-family: var(--font-sans);
+    font-size: var(--t-xs);
+    color: var(--ink-3);
+    margin-top: var(--s3);
+    text-align: center;
+    font-weight: 300;
+    line-height: 1.5;
+  }
+
+  /* ============ Page 3 · collection ============ */
+  .col-summary {
+    background: var(--white);
+    border: 1px solid var(--hairline);
+    padding: var(--s5);
+    margin-bottom: var(--s4);
+    display: flex;
+    align-items: center;
+    gap: var(--s4);
+  }
+  .col-summary-total {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-3xl);
+    color: var(--seal);
+    font-weight: 500;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .col-summary-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+  }
+  .col-summary-label {
+    font-family: var(--font-serif);
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    letter-spacing: var(--ls-2);
+    line-height: 1;
+  }
+  .col-summary-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s3);
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    color: var(--ink-2);
+    font-weight: 300;
+    letter-spacing: var(--ls-1);
+    line-height: 1.4;
+  }
+  .col-summary-stats span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .col-summary-stats b {
+    font-family: var(--font-num);
+    font-style: italic;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  .sort-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s4);
+    margin-bottom: var(--s4);
+    padding-bottom: var(--s3);
+    border-bottom: 1px solid var(--hairline);
+    font-family: var(--font-serif);
+    font-size: var(--t-md);
+    letter-spacing: var(--ls-2);
+    line-height: 1;
+  }
+  .sort-label { color: var(--ink-3); }
+  .sort-pill {
+    color: var(--ink-2);
+    padding-bottom: 2px;
+    font-weight: 400;
+    line-height: 1;
+    border-bottom: 1px solid transparent;
+  }
+  .sort-pill.active {
+    color: var(--ink);
+    border-bottom-color: var(--seal);
+    font-weight: 500;
+  }
+  .sort-row .manual {
+    margin-left: auto;
+    color: var(--ink-2);
+  }
+
+  /* 拓本卡 */
+  .rubbing {
+    background: var(--white);
+    border: 1px solid var(--hairline);
+    padding: var(--s4) var(--s5);
+    margin-bottom: var(--s3);
+  }
+  .rubbing:last-child { margin-bottom: 0; }
+  .rubbing.hero-row {
+    background: linear-gradient(180deg, var(--white) 0%, #fef6f3 100%);
+    border-color: var(--seal-soft);
+  }
+
+  .rubbing-head {
+    display: flex;
+    align-items: center;     /* center */
+    gap: var(--s3);
+    margin-bottom: var(--s2);
+  }
+  .rub-emoji {
+    width: 24px; height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .rub-name {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-serif);
+    font-size: var(--t-lg);
+    font-weight: 600;
+    letter-spacing: var(--ls-2);
+    line-height: 1.3;
+  }
+  .rub-mult {
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-2xl);
+    font-weight: 500;
+    color: var(--seal);
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .rub-mult.dim { color: var(--ink-2); }
+
+  .rub-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2) var(--s4);
+    margin: var(--s1) 0 var(--s2);
+    font-family: var(--font-sans);
+    font-size: var(--t-sm);
+    font-weight: 300;
+    line-height: 1.4;
+  }
+  .rub-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--ink-2);
+    line-height: 1.4;
+  }
+  .rub-badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--ink-3);
+    flex-shrink: 0;
+  }
+  .rub-badge.hero    { color: var(--seal); }
+  .rub-badge.hero::before { background: var(--seal); }
+  .rub-badge.giant   { color: var(--gold); }
+  .rub-badge.giant::before { background: var(--gold); }
+  .rub-badge.purple  { color: var(--purple); }
+  .rub-badge.purple::before { background: var(--purple); }
+  .rub-badge.normal  { color: var(--blue); }
+  .rub-badge.normal::before { background: var(--blue); }
+
+  .rub-note {
+    font-family: var(--font-serif);
+    font-size: var(--t-sm);
+    font-style: italic;
+    color: var(--ink-2);
+    line-height: 1.7;
+    margin: var(--s2) 0;
+    padding-left: var(--s2);
+    border-left: 1px solid var(--seal-soft);
+    font-weight: 300;
+  }
+  .rub-shot {
+    height: 70px;
+    background: linear-gradient(135deg, var(--paper-2) 0%, var(--paper-3) 100%);
+    margin: var(--s2) 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: var(--ink-3);
+    border: 1px solid var(--hairline);
+    line-height: 1;
+  }
+  .rub-foot {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+    margin-top: var(--s2);
+    font-family: var(--font-num);
+    font-style: italic;
+    font-size: var(--t-sm);
+    color: var(--ink-3);
+    font-weight: 400;
+    line-height: 1;
+  }
+  .rub-foot .public  { color: var(--bamboo); font-style: normal; }
+  .rub-foot .private { color: var(--ink-3); font-style: normal; }
+  .rub-foot .actions {
+    margin-left: auto;
+    display: flex;
+    gap: var(--s3);
+    font-style: normal;
+  }
+  .rub-foot .actions span {
+    font-family: var(--font-sans);
+    color: var(--ink-3);
+    font-size: var(--t-sm);
+    line-height: 1;
+  }
+
+</style>
+</head>
+<body>
+
+<header class="ref-card">
+  <div>
+    <h1><span class="accent">A.</span> 稷 下 风 尚 · 淡 墨 重 做 v3</h1>
+    <div class="ref-sub">docs/design-explorations.md §3 方向 A &nbsp;·&nbsp; 1:1 wxml &nbsp;·&nbsp; 3 层背景对比 &nbsp;·&nbsp; 8 级 spacing &nbsp;·&nbsp; 5 档 letter-spacing</div>
+  </div>
+  <div class="ref-swatches">
+    <span style="background:#ddd2b8" title="桌面"></span>
+    <span style="background:#fbf8f1" title="screen"></span>
+    <span style="background:#ffffff" title="content"></span>
+    <span style="background:#f5f0e6" title="locked"></span>
+    <span style="background:#2a2418" title="ink"></span>
+    <span style="background:#b94a3b" title="seal"></span>
+    <span style="background:#8da66f" title="bamboo"></span>
+    <span style="background:#c9a663" title="gold"></span>
+  </div>
+  <div class="ref-sub">
+    <b>字体</b>　Noto Serif SC · Noto Sans SC 300/400 · <i style="font-family:'Cormorant Garamond',serif">Cormorant Garamond</i> 数字<br>
+    <b>对齐</b>　flex center 不用 baseline · 罗马数字右对齐 · mature ring 用 inset shadow 不影响内容宽度
+  </div>
+</header>
+
+<main class="screens">
+
+  <!-- ============ Page 1 · login ============ -->
+  <section class="screen no-tabbar page-login">
+    <div class="screen-label">i.</div>
+
+    <div class="login-brand">
+      <div class="seal-big">农</div>
+      <h1>农 场 助 手</h1>
+      <div class="tagline">浇 水 提 醒  ·  纪 念 册 分 享</div>
+    </div>
+
+    <div class="login-card">
+      <div class="card-title">登 录 · 注 册</div>
+      <div class="card-sub">昵称不存在会自动注册<br>PIN 用于保护写操作</div>
+      <input class="input-line" placeholder="昵称" value="长缨">
+      <input class="input-line num" placeholder="4 位 PIN" value="••••" type="text">
+      <button class="btn-line">登 录 / 注 册</button>
+    </div>
+
+    <div class="features">
+      <div class="feature-row">
+        <span class="feature-num">I.</span>
+        <div class="feature-text">
+          <div class="feature-title">实 时 浇 水 推 荐</div>
+          <div class="feature-desc">浇一次立即重算下次最优时机</div>
+        </div>
+      </div>
+      <div class="feature-row">
+        <span class="feature-num">II.</span>
+        <div class="feature-text">
+          <div class="feature-title">三 种 路 径 任 选</div>
+          <div class="feature-desc">最快  ·  懒人  ·  自然</div>
+        </div>
+      </div>
+      <div class="feature-row">
+        <span class="feature-num">III.</span>
+        <div class="feature-text">
+          <div class="feature-title">纪 念 册</div>
+          <div class="feature-desc">收藏稀有变异，跟好友炫耀</div>
+        </div>
+      </div>
+      <div class="feature-row">
+        <span class="feature-num">IV.</span>
+        <div class="feature-text">
+          <div class="feature-title">朋 友 圈 互 动</div>
+          <div class="feature-desc">看好友农场，点赞 / 提问号</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="invite-link">📨<span>邀 请 朋 友 一 起 种 田</span></button>
+    <div class="login-footer">用得开心 ?  分享给朋友吧</div>
+  </section>
+
+  <!-- ============ Page 2 · index ============ -->
+  <section class="screen page-index">
+    <div class="screen-label">ii.</div>
+
+    <div class="header-bar">
+      <h2><span class="leaf">𓆰</span><span>自 用 农 场 助 手</span></h2>
+      <div class="header-actions">
+        <span>刷新</span>
+        <span>分享</span>
+        <span class="nick">长缨</span>
+        <span class="logout">登出</span>
+      </div>
+    </div>
+
+    <div class="action-pair">
+      <button class="action-line">+&nbsp;&nbsp;新 种 作 物</button>
+      <button class="action-line import">已 种 了 怎 么 办</button>
+    </div>
+
+    <!-- Card 1: normal -->
+    <div class="crop-card">
+      <div class="crop-head">
+        <span class="crop-emoji">🌽</span>
+        <div class="crop-title">
+          <span class="type-prefix">16h ·</span>
+          <span>玉 米</span>
+        </div>
+        <span class="crop-edit">编辑</span>
+        <span class="crop-del">删除</span>
+      </div>
+      <div class="crop-planted">种于  2026 . 04 . 30  09 : 30</div>
+
+      <div class="moist-row">
+        <span>湿润度</span>
+        <span class="moist-pct">65%</span>
+      </div>
+      <div class="moist-bar"><div class="moist-fill"></div></div>
+
+      <div class="paths">
+        <div class="path-row">
+          <span class="path-icon">🏃</span>
+          <div class="path-content">
+            <div class="path-name"><span class="name-tag fast">最 快 路 径</span></div>
+            <div class="path-detail">
+              浇水时机：<span class="num">18:00 前</span>　·　距浇水 <span class="num">8h 30min</span>
+              <span class="est">　·　预计成熟 17:30 次日</span>
+              <span class="warn">⚠ 21:00 后进入禁浇期，浇水会无法即熟</span>
+            </div>
+          </div>
+        </div>
+        <div class="path-row">
+          <span class="path-icon">💤</span>
+          <div class="path-content">
+            <div class="path-name">
+              <span class="name-tag lazy">懒 人 路 径</span>
+              <span class="lazy-hint">　·　浇水即熟</span>
+            </div>
+            <div class="path-detail">
+              浇水时机：<span class="num">01:00 次日</span>　·　距浇水 <span class="num">15h 30min</span>
+              <span class="est">　·　预计成熟 03:30 次日</span>
+            </div>
+          </div>
+        </div>
+        <div class="path-row">
+          <span class="path-icon">🌱</span>
+          <div class="path-content">
+            <div class="path-name"><span class="name-tag natural">自 然 生 长</span></div>
+            <div class="path-detail">
+              不再浇水
+              <span class="est">　·　预计成熟 13:30 次日 · 距成熟 <span class="num">28h</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="water-tip">
+        已浇 <span class="num">5</span> 次　·　💧 现在浇水可减 <span class="reduce num">30 min</span>
+      </div>
+      <button class="btn-water">浇 水</button>
+    </div>
+
+    <!-- Card 2: last-water -->
+    <div class="crop-card mature-ring">
+      <div class="crop-head">
+        <span class="crop-emoji">🫐</span>
+        <div class="crop-title">
+          <span class="type-prefix">32h ·</span>
+          <span>蓝 莓</span>
+        </div>
+        <span class="crop-edit">编辑</span>
+        <span class="crop-del">删除</span>
+      </div>
+      <div class="crop-planted">种于  2026 . 04 . 29  22 : 00</div>
+
+      <div class="last-water-block">
+        <div class="last-water-tag">浇 水 即 熟 阶 段</div>
+        <div class="countdown-num">00 : 48</div>
+        <div class="last-water-sub">现在浇水立即成熟　·　已浇 <span class="num">12</span> 次</div>
+      </div>
+      <button class="btn-water-harvest">浇 水 + 收 获</button>
+    </div>
+
+    <!-- Card 3: locked -->
+    <div class="crop-card locked-card">
+      <div class="crop-head">
+        <span class="crop-emoji">🌾</span>
+        <div class="crop-title">
+          <span class="type-prefix">8h ·</span>
+          <span>麦 穗</span>
+        </div>
+        <span class="crop-edit">编辑</span>
+        <span class="crop-del">删除</span>
+      </div>
+      <div class="crop-planted">种于  2026 . 04 . 30  06 : 00</div>
+
+      <div class="locked-box">
+        <div class="locked-head">🔒  冷 却 锁 定  ·  无 法 再 浇 水</div>
+        <div class="locked-desc">
+          上次浇水冷却至 <span class="em">13:30</span>，但作物会先于 <span class="em bamboo">14:00</span> 自然成熟（<span class="em">8h</span> 后）。
+        </div>
+        <div class="locked-hint">不用任何操作，等自然成熟直接收。</div>
+      </div>
+    </div>
+
+    <!-- Card 4: harvested -->
+    <div class="crop-card">
+      <div class="crop-head">
+        <span class="crop-emoji">🌽</span>
+        <div class="crop-title">
+          <span class="type-prefix">16h ·</span>
+          <span>我 的 高 产 玉 米</span>
+        </div>
+        <span class="crop-edit">编辑</span>
+        <span class="crop-del">删除</span>
+      </div>
+      <div class="crop-planted">种于  2026 . 04 . 28  12 : 00</div>
+
+      <div class="harvest-status">
+        <span class="check">✓</span>
+        <span>已 收 获</span>
+        <span>·</span>
+        <span class="num">04 . 29  04:00</span>
+      </div>
+      <div class="harvest-actions">
+        <button class="btn-secondary">↻&nbsp;&nbsp;再 种 一 棵　（同类型 · 沿用立刻浇水）</button>
+        <button class="btn-secondary collected">✓&nbsp;&nbsp;已 收 入 纪 念 册  ·  点 此 查 看</button>
+      </div>
+      <div class="harvest-footer">30 分钟后自动清理</div>
+    </div>
+
+    <nav class="tabbar">
+      <div class="tab-item active">
+        <div class="tab-icon-wrap"><span class="tab-icon">🌱</span></div>
+        <span>主页</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap"><span class="tab-icon">🏆</span></div>
+        <span>纪念册</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap"><span class="tab-icon">🌐</span></div>
+        <span>朋友圈</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap">
+          <span class="tab-icon">🤝</span>
+          <span class="tab-badge">2</span>
+        </div>
+        <span>好友</span>
+      </div>
+    </nav>
+  </section>
+
+  <!-- ============ Page 3 · collection ============ -->
+  <section class="screen page-collection">
+    <div class="screen-label">iii.</div>
+
+    <div class="header-bar">
+      <h2><span>我 的 纪 念 册</span></h2>
+      <div class="header-actions">
+        <span>刷新</span>
+        <span class="nick">长缨</span>
+      </div>
+    </div>
+
+    <div class="col-summary">
+      <div class="col-summary-total">5</div>
+      <div class="col-summary-info">
+        <div class="col-summary-label">件 收 藏</div>
+        <div class="col-summary-stats">
+          <span>🌈 英雄 <b>1</b></span>
+          <span>🟡 巨大化 <b>2</b></span>
+          <span>🟣 紫色 <b>2</b></span>
+          <span>🔵 普通 <b>1</b></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sort-row">
+      <span class="sort-label">排序</span>
+      <span class="sort-pill active">倍数 ↓</span>
+      <span class="sort-pill">时间 ↓</span>
+      <span class="manual">+ 手 动 录 入</span>
+    </div>
+
+    <!-- 1. 玉米 永夜之心 -->
+    <div class="rubbing hero-row">
+      <div class="rubbing-head">
+        <span class="rub-emoji">🌽</span>
+        <div class="rub-name">玉 米 · 永 夜 之 心</div>
+        <div class="rub-mult">×28</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge hero">英雄 ×28</span>
+        <span class="rub-badge giant">巨大化 ×8</span>
+        <span class="rub-badge purple">紫色 · 青玉 ×2.5</span>
+      </div>
+      <div class="rub-note">"永夜之心 · 28 倍金光 · 一辈子就这一棵"</div>
+      <div class="rub-shot">🌽</div>
+      <div class="rub-foot">
+        <span>04 . 28  22:13</span>
+        <span class="public">● 公开</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <!-- 2. 蓝莓 高产巨型 -->
+    <div class="rubbing">
+      <div class="rubbing-head">
+        <span class="rub-emoji">🫐</span>
+        <div class="rub-name">蓝 莓 · 高 产 巨 型</div>
+        <div class="rub-mult">×11</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge giant">巨大化 ×8</span>
+        <span class="rub-badge purple">紫色 · 琉璃 ×3</span>
+      </div>
+      <div class="rub-note">"巨大化叠琉璃，夜晚出货"</div>
+      <div class="rub-shot">🫐</div>
+      <div class="rub-foot">
+        <span>04 . 20  14:02</span>
+        <span class="public">● 公开</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <!-- 3. 玉米 青玉 -->
+    <div class="rubbing">
+      <div class="rubbing-head">
+        <span class="rub-emoji">🌽</span>
+        <div class="rub-name">玉 米 · 青 玉</div>
+        <div class="rub-mult dim">×2.5</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge purple">紫色 · 青玉 ×2.5</span>
+      </div>
+      <div class="rub-shot">🌽</div>
+      <div class="rub-foot">
+        <span>04 . 18  09:45</span>
+        <span class="private">○ 私密</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <!-- 4. 蓝莓 巨型 -->
+    <div class="rubbing">
+      <div class="rubbing-head">
+        <span class="rub-emoji">🫐</span>
+        <div class="rub-name">蓝 莓 · 巨 型</div>
+        <div class="rub-mult dim">×8</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge giant">巨大化 ×8</span>
+      </div>
+      <div class="rub-note">"周末双倍翻盘"</div>
+      <div class="rub-foot">
+        <span>04 . 15  19:21</span>
+        <span class="public">● 公开</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <!-- 5. 麦穗 颜色 -->
+    <div class="rubbing">
+      <div class="rubbing-head">
+        <span class="rub-emoji">🌾</span>
+        <div class="rub-name">麦 穗 · 颜 色</div>
+        <div class="rub-mult dim">×1.5</div>
+      </div>
+      <div class="rub-badges">
+        <span class="rub-badge normal">普通 ×1.5</span>
+      </div>
+      <div class="rub-foot">
+        <span>04 . 10  11:08</span>
+        <span class="public">● 公开</span>
+        <div class="actions"><span>编辑</span><span>删除</span></div>
+      </div>
+    </div>
+
+    <nav class="tabbar">
+      <div class="tab-item">
+        <div class="tab-icon-wrap"><span class="tab-icon">🌱</span></div>
+        <span>主页</span>
+      </div>
+      <div class="tab-item active">
+        <div class="tab-icon-wrap"><span class="tab-icon">🏆</span></div>
+        <span>纪念册</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap"><span class="tab-icon">🌐</span></div>
+        <span>朋友圈</span>
+      </div>
+      <div class="tab-item">
+        <div class="tab-icon-wrap">
+          <span class="tab-icon">🤝</span>
+          <span class="tab-badge">2</span>
+        </div>
+        <span>好友</span>
+      </div>
+    </nav>
+  </section>
+
+</main>
+
+</body>
+</html>
